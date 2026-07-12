@@ -294,40 +294,7 @@ kbd{font-family:inherit}
 
 <div class="section">
   <div class="slabel">Next-event predictions &nbsp;&middot;&nbsp; click any card to filter map &amp; drill down</div>
-  <div class="pred-grid">
-    <div class="pred-card" onclick="linkCard('overall',this)">
-      <div class="pred-grp" style="color:var(--amber)">Overall</div>
-      <div class="pred-date">Apr 1, 2026</div>
-      <div class="pred-meta">Last: Mar 31 &nbsp;&middot;&nbsp; Gap: 1.4 days</div>
-      <div class="pred-where">Region-wide &middot; DC / N. Maryland</div>
-      <div class="cbar-track"><div class="cbar-fill" style="width:68%;background:var(--amber)"></div></div>
-      <div style="font-size:10px;color:var(--text3);margin-top:3px">68% confidence</div>
-    </div>
-    <div class="pred-card" onclick="linkCard('Jewish',this)">
-      <div class="pred-grp" style="color:#85B7EB">Jewish</div>
-      <div class="pred-date">Apr 2, 2026</div>
-      <div class="pred-meta">Last: Mar 31 &middot; Gap: 2.8 days &middot; 618 events</div>
-      <div class="pred-where">Rockville&ndash;Bethesda corridor (MD)</div>
-      <div class="cbar-track"><div class="cbar-fill" style="width:70%;background:var(--blue)"></div></div>
-      <div style="font-size:10px;color:var(--text3);margin-top:3px">70% confidence</div>
-    </div>
-    <div class="pred-card" onclick="linkCard('Black',this)">
-      <div class="pred-grp" style="color:#5DCAA5">Black</div>
-      <div class="pred-date">Mar 30, 2026</div>
-      <div class="pred-meta">Last: Mar 27 &middot; Gap: 3.0 days &middot; 542 events</div>
-      <div class="pred-where">Silver Spring&ndash;Wheaton (MD)</div>
-      <div class="cbar-track"><div class="cbar-fill" style="width:65%;background:var(--teal)"></div></div>
-      <div style="font-size:10px;color:var(--text3);margin-top:3px">65% confidence</div>
-    </div>
-    <div class="pred-card" onclick="linkCard('Homosexual',this)">
-      <div class="pred-grp" style="color:#AFA9EC">Homosexual</div>
-      <div class="pred-date">Mar 28, 2026</div>
-      <div class="pred-meta">Last: Mar 23 &middot; Gap: 5.4 days &middot; 246 events</div>
-      <div class="pred-where">Dupont / Logan Circle (DC)</div>
-      <div class="cbar-track"><div class="cbar-fill" style="width:60%;background:var(--purple)"></div></div>
-      <div style="font-size:10px;color:var(--text3);margin-top:3px">60% confidence</div>
-    </div>
-  </div>
+  <div class="pred-grid" id="predGrid"></div>
 </div>
 
 <div class="section">
@@ -956,7 +923,7 @@ function linkGroup(g){
 function linkCard(group,el){
   document.querySelectorAll('.pred-card').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
-  if(group!=='overall') linkGroup(group);
+  if(group!=='Overall') linkGroup(group);
   else{S.groups.clear();document.getElementById('btnGrpAll').classList.add('active');document.querySelectorAll('.grp-tog').forEach(function(b){b.classList.remove('grp-active');});render();}
   openDrill(group);
 }
@@ -1081,16 +1048,45 @@ new Chart(document.getElementById('stackedChart'),{
   }
 });
 
+function regionLabel(lat,lon){
+  if(lat<38.97&&lon>-77.06) return 'DC Core';
+  if(lat<38.97) return 'SE DC/MD';
+  if(lat<39.06&&lon<-77.08) return 'Bethesda';
+  if(lat<39.06) return 'Silver Spring';
+  if(lat<39.15) return 'N. Mont Co';
+  return 'NW Mont Co';
+}
+function fmtPredDate(iso){
+  var d=new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+function fmtShortDate(iso){
+  var d=new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function renderPredCards(){
+  var grid=document.getElementById('predGrid');
+  if(!grid||!PREDS||!PREDS.length) return;
+  var cards=PREDS.slice(0,4);
+  grid.innerHTML=cards.map(function(p){
+    var isOverall=p.group==='Overall';
+    var color=isOverall?'var(--amber)':gc(p.group);
+    var where=isOverall?'Region-wide \u00b7 DC / Montgomery Co.':
+      regionLabel(p.hot_lat,p.hot_lon)+' ('+p.hot_state+')';
+    var meta='Last: '+fmtShortDate(p.last)+' \u00b7 Gap: '+p.gap+' days'+(isOverall?'':' \u00b7 '+p.n+' events');
+    return '<div class="pred-card" onclick="linkCard(\''+p.group+'\',this)">'+
+      '<div class="pred-grp" style="color:'+color+'">'+p.group+'</div>'+
+      '<div class="pred-date">'+fmtPredDate(p.next)+'</div>'+
+      '<div class="pred-meta">'+meta+'</div>'+
+      '<div class="pred-where">'+where+'</div>'+
+      '<div class="cbar-track"><div class="cbar-fill" style="width:'+p.confidence+'%;background:'+color+'"></div></div>'+
+      '<div style="font-size:10px;color:var(--text3);margin-top:3px">'+p.confidence+'% confidence</div>'+
+    '</div>';
+  }).join('');
+}
 function kmBar(id,data){
   const valid=data.filter(function(d){return d.lat>38.5&&d.lat<39.5&&d.lon>-78.5&&d.lon<-76.5;});
-  const lbls=valid.map(function(d){
-    if(d.lat<38.97&&d.lon>-77.06) return d.top_group+' - DC Core';
-    if(d.lat<38.97) return d.top_group+' - SE DC/MD';
-    if(d.lat<39.06&&d.lon<-77.08) return d.top_group+' - Bethesda';
-    if(d.lat<39.06) return d.top_group+' - Silver Spring';
-    if(d.lat<39.15) return d.top_group+' - N. Mont Co';
-    return d.top_group+' - NW Mont Co';
-  });
+  const lbls=valid.map(function(d){return d.top_group+' - '+regionLabel(d.lat,d.lon);});
   new Chart(document.getElementById(id),{
     type:'bar',
     data:{labels:lbls,datasets:[{label:'Events',data:valid.map(function(d){return d.events;}),
@@ -1101,6 +1097,7 @@ function kmBar(id,data){
               y:{ticks:{color:TC,font:{size:10}},grid:{color:GC2}}}}
   });
 }
+renderPredCards();
 kmBar('kmAllChart',KM_ALL);
 kmBar('km25Chart',KM_25);
 
@@ -1314,17 +1311,17 @@ function openDrill(group){
   const risk=RISK.find(function(r){return r.group===group;});
   const offs=(OFFENSE_GRP[group]||[]).slice(0,5);
   const evCnt=EV_RAW.filter(function(e){return evGroup(e)===group;}).length;
-  const col=group==='overall'?'var(--amber)':gc(group);
-  document.getElementById('drillTitle').textContent=group==='overall'?'Overall — next event prediction':group+' — detailed analysis';
+  const col=group==='Overall'?'var(--amber)':gc(group);
+  document.getElementById('drillTitle').textContent=group==='Overall'?'Overall — next event prediction':group+' — detailed analysis';
   document.getElementById('drillTitle').style.color=col;
   let html='';
-  if(group==='overall'){
+  if(group==='Overall'&&pred){
     html='<div class="dd-grid">'+
-      '<div class="dd-metric"><div class="dd-lbl">Predicted next</div><div class="dd-val">Apr 1, 2026</div></div>'+
-      '<div class="dd-metric"><div class="dd-lbl">Last event</div><div class="dd-val">Mar 31, 2026</div></div>'+
-      '<div class="dd-metric"><div class="dd-lbl">Mean gap</div><div class="dd-val">1.4 days</div></div>'+
-      '<div class="dd-metric"><div class="dd-lbl">Events (2023+)</div><div class="dd-val">1,406</div></div>'+
-    '</div><div style="font-size:12px;color:var(--text2);line-height:1.8">Events occur at ~5/week. Jewish (30%) and Black (28%) most frequently targeted in 2023–2026.</div>';
+      '<div class="dd-metric"><div class="dd-lbl">Predicted next</div><div class="dd-val" style="color:'+col+'">'+fmtPredDate(pred.next)+'</div></div>'+
+      '<div class="dd-metric"><div class="dd-lbl">Last event</div><div class="dd-val">'+fmtPredDate(pred.last)+'</div></div>'+
+      '<div class="dd-metric"><div class="dd-lbl">Mean gap</div><div class="dd-val">'+pred.gap+' days</div></div>'+
+      '<div class="dd-metric"><div class="dd-lbl">Events (2023+)</div><div class="dd-val">'+pred.n.toLocaleString()+'</div></div>'+
+    '</div><div style="font-size:12px;color:var(--text2);line-height:1.8">Combined rate across all groups since 2023, refreshed automatically each week.</div>';
   } else if(pred){
     html='<div class="dd-grid">'+
       '<div class="dd-metric"><div class="dd-lbl">Predicted next</div><div class="dd-val" style="color:'+col+'">'+pred.next+'</div></div>'+
@@ -1621,7 +1618,7 @@ function exportReport(){
     'Simple assault = 6, ADW = 8, vandalism = 3, threats = 5, verbal intimidation = 4.</div>'+
 
     '<h2>Prediction snapshot</h2>'+
-    PREDS.map(function(p){
+    PREDS.slice(0,5).map(function(p){
       return '<div style="margin-bottom:6px;font-size:12px"><strong style="color:#2a5fa5">'+p.group+':</strong> '+
         'Next predicted event: <strong>'+p.next+'</strong> &nbsp;&middot;&nbsp; '+
         '70% CI: '+p.ci_lo+' &ndash; '+p.ci_hi+' &nbsp;&middot;&nbsp; '+

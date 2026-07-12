@@ -185,55 +185,78 @@ def kmeans_hotspots(events, k=KMEANS_K):
     return hotspots
 
 
+def _predict_one(evs_sorted):
+    """Fit the exponential inter-arrival model on one already-sorted list
+    of events and return a prediction dict, or None if too little data."""
+    if len(evs_sorted) < 3:
+        return None
+    gaps = [
+        (evs_sorted[i]["_date"] - evs_sorted[i - 1]["_date"]).days
+        for i in range(1, len(evs_sorted))
+    ]
+    mean_gap = sum(gaps) / len(gaps) if gaps else None
+    if not mean_gap:
+        return None
+    last_date = evs_sorted[-1]["_date"]
+    next_date = last_date + timedelta(days=mean_gap)
+    # Exponential distribution: 90% CI roughly [gap*0.05, gap*2.3] scaled by mean.
+    ci_lo = last_date + timedelta(days=mean_gap * 0.05)
+    ci_hi = last_date + timedelta(days=mean_gap * 2.3)
+
+    lat_c = sum(e["lat"] for e in evs_sorted) / len(evs_sorted)
+    lon_c = sum(e["lon"] for e in evs_sorted) / len(evs_sorted)
+    state_counts = Counter(e["state"] for e in evs_sorted)
+    top_state = state_counts.most_common(1)[0][0]
+
+    # Confidence heuristic: more historical events -> tighter trust in the
+    # fitted rate. Not a formal statistical confidence interval coverage
+    # value, just a simple, transparent scaling used for the UI's progress
+    # bar (same spirit as the original hand-authored dashboard's numbers,
+    # but now actually derived from the data instead of static).
+    n = len(evs_sorted)
+    confidence = min(95, round(50 + min(n, 200) / 200 * 45))
+
+    return {
+        "last": last_date.strftime("%Y-%m-%d"),
+        "next": next_date.strftime("%Y-%m-%d"),
+        "ci_lo": ci_lo.strftime("%Y-%m-%d"),
+        "ci_hi": ci_hi.strftime("%Y-%m-%d"),
+        "gap": round(mean_gap, 1),
+        "n": n,
+        "hot_lat": round(lat_c, 5),
+        "hot_lon": round(lon_c, 5),
+        "hot_state": top_state,
+        "confidence": confidence,
+    }
+
+
 def inter_arrival_predictions(events):
-    """Exponential inter-arrival model fit on PRED_MIN_YEAR+ events per
-    group: mean_gap = mean(days between consecutive events), predicted
-    next date = last_date + mean_gap, with a rough 90% CI derived from the
-    exponential distribution's spread."""
+    """Exponential inter-arrival model fit on PRED_MIN_YEAR+ events, both
+    per-group and as a single combined "Overall" prediction across every
+    group's events together."""
+    scoped = [e for e in events if e["_date"].year >= PRED_MIN_YEAR]
+
     by_group = defaultdict(list)
-    for e in events:
-        if e["_date"].year >= PRED_MIN_YEAR:
-            by_group[e["group"]].append(e)
+    for e in scoped:
+        by_group[e["group"]].append(e)
 
     preds = []
+
+    overall_sorted = sorted(scoped, key=lambda e: e["_date"])
+    overall_pred = _predict_one(overall_sorted)
+    if overall_pred:
+        overall_pred["group"] = "Overall"
+        preds.append(overall_pred)
+
     for group, evs in by_group.items():
         evs_sorted = sorted(evs, key=lambda e: e["_date"])
-        if len(evs_sorted) < 3:
-            continue
-        gaps = [
-            (evs_sorted[i]["_date"] - evs_sorted[i - 1]["_date"]).days
-            for i in range(1, len(evs_sorted))
-        ]
-        mean_gap = sum(gaps) / len(gaps) if gaps else None
-        if not mean_gap:
-            continue
-        last_date = evs_sorted[-1]["_date"]
-        next_date = last_date + timedelta(days=mean_gap)
-        # Exponential distribution: 90% CI roughly [gap*0.05, gap*2.3] scaled by mean.
-        ci_lo = last_date + timedelta(days=mean_gap * 0.05)
-        ci_hi = last_date + timedelta(days=mean_gap * 2.3)
+        pred = _predict_one(evs_sorted)
+        if pred:
+            pred["group"] = group
+            preds.append(pred)
 
-        # Hotspot = centroid of this group's most recent cluster of events
-        # (simple recency-weighted centroid over the whole 2023+ window).
-        lat_c = sum(e["lat"] for e in evs_sorted) / len(evs_sorted)
-        lon_c = sum(e["lon"] for e in evs_sorted) / len(evs_sorted)
-        state_counts = Counter(e["state"] for e in evs_sorted)
-        top_state = state_counts.most_common(1)[0][0]
-
-        preds.append({
-            "group": group,
-            "last": last_date.strftime("%Y-%m-%d"),
-            "next": next_date.strftime("%Y-%m-%d"),
-            "ci_lo": ci_lo.strftime("%Y-%m-%d"),
-            "ci_hi": ci_hi.strftime("%Y-%m-%d"),
-            "gap": round(mean_gap, 1),
-            "n": len(evs_sorted),
-            "hot_lat": round(lat_c, 5),
-            "hot_lon": round(lon_c, 5),
-            "hot_state": top_state,
-        })
-
-    preds.sort(key=lambda p: p["n"], reverse=True)
+    # Keep "Overall" first, then sort the rest by sample size descending.
+    preds[1:] = sorted(preds[1:], key=lambda p: -p["n"])
     return preds
 
 

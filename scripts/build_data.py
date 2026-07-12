@@ -192,7 +192,13 @@ def clean_mcpd_record(rec):
 
     bias_1 = rec.get("bias_code") or rec.get("bias")
     bias_2 = rec.get("bias_code_2")
-    offense = rec.get("offense") or rec.get("crimename1")
+    # NOTE: the Socrata field literally named "bias" is confusingly the
+    # OFFENSE-type description ("Vandalism", "Verbal Intimidation/Simple
+    # Assault", etc.) per the dataset's own column description ("Describes
+    # how the bias was manifested by the offender") - confirmed against the
+    # live schema. "bias_code"/"bias_code_2" are the actual bias/group
+    # fields, handled separately above.
+    offense = rec.get("bias")
 
     raw_labels = []
     if bias_1:
