@@ -158,6 +158,7 @@ def spatio_temporal_dbscan(events, min_samples):
                 "sev": round(sum(sevs) / len(sevs), 1) if sevs else None,
                 "member_ids": [m.get("id") for m in members if m.get("id")],
             })
+    clusters_out.sort(key=lambda c: -c["events"])
     return clusters_out
 
 
@@ -172,10 +173,13 @@ def kmeans_hotspots(events, k=KMEANS_K):
         if not members:
             continue
         center = km.cluster_centers_[i]
+        group_counts = Counter(m["group"] for m in members)
+        top_group = group_counts.most_common(1)[0][0]
         hotspots.append({
             "lat": round(float(center[0]), 5),
             "lon": round(float(center[1]), 5),
             "events": len(members),
+            "top_group": top_group,
         })
     hotspots.sort(key=lambda h: -h["events"])
     return hotspots
