@@ -51,11 +51,38 @@ with open(SEV_MAP_PATH) as f:
 OFFENSE_TOKENS = set(SEVERITY_MAP.keys())
 
 SUBGROUP_TO_GROUP = {
+    # Jewish
     "Israeli": "Jewish", "Jewish": "Jewish",
+    # Asian (specific ethnicities)
     "Chinese": "Asian", "Korean": "Asian", "Indian": "Asian",
     "Pakistani": "Asian", "Japanese": "Asian", "Taiwanese": "Asian",
     "Vietnamese": "Asian", "Filipino": "Asian",
-    "African": "Black", "Black": "Black",
+    # Black / African
+    "African": "Black", "Black": "Black", "Black/African": "Black",
+    "Ethiopian": "Black", "Oromo": "Black", "Jamaican": "Black",
+    # Hispanic / Latino (nationality-level labels)
+    "Latino/Hispanic": "Hispanic", "Mexican": "Hispanic",
+    "Guatemalan": "Hispanic", "Colombian": "Hispanic",
+    "Puerto Rican": "Hispanic", "Venezuelan": "Hispanic",
+    # Sexual orientation variants -> canonical "Homosexual" bucket
+    "Male Homosexual": "Homosexual", "Female Homosexual": "Homosexual",
+    "Bisexual": "Homosexual", "Homosexual": "Homosexual",
+    # Gender identity
+    "Gender Non-Conforming": "Transgender",
+    # Islamic / Muslim
+    "Muslim": "Islamic", "Islamic": "Islamic",
+    # Arab / Middle Eastern
+    "Middle Eastern": "Arab", "Arab/Middle Eastern": "Arab",
+    "Palestinian": "Arab", "Non-Palestinian": "Arab", "Lebanese": "Arab",
+    # Disability
+    "Mental Disability": "Disabled", "Physical Disability": "Disabled",
+    # Spelling / naming normalization
+    "Hindhu": "Hindu", "Homelessness": "Homeless", "Unknown": "Unspecified",
+    "Multiple": "Unspecified",
+    # Ethnicities without a clean canonical bucket -> Other Ethnicity
+    "Iranian": "Other Ethnicity", "Turkish": "Other Ethnicity",
+    "Russian": "Other Ethnicity", "Ukrainian": "Other Ethnicity",
+    "Non-European": "Other Ethnicity",
 }
 
 BIAS_TYPE_TO_GROUP = {
