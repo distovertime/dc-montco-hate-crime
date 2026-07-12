@@ -1340,7 +1340,7 @@ function openDrill(group){
       '<div class="dd-metric"><div class="dd-lbl">70% CI</div><div class="dd-val" style="font-size:13px">'+pred.ci_lo+' – '+pred.ci_hi+'</div></div>'+
       '<div class="dd-metric"><div class="dd-lbl">Mean gap</div><div class="dd-val">'+pred.gap+' days</div></div>'+
       '<div class="dd-metric"><div class="dd-lbl">Events (2023+)</div><div class="dd-val">'+pred.n+'</div></div>'+
-      '<div class="dd-metric"><div class="dd-lbl">Location</div><div class="dd-val" style="font-size:13px">'+(pred.hot_state==='DC'?'Washington DC':'Montgomery Co, MD')+'</div></div>'+
+      '<div class="dd-metric"><div class="dd-lbl">Location</div><div class="dd-val" style="font-size:13px">'+(pred.hot_place?pred.hot_place+' ('+pred.hot_state+')':(pred.hot_state==='DC'?'Washington DC':'Montgomery Co, MD'))+'</div></div>'+
       '<div class="dd-metric"><div class="dd-lbl">Risk score</div><div class="dd-val" style="color:'+col+'">'+(risk?risk.score.toFixed(0):'-')+'/100</div></div>'+
     '</div>';
     if(offs.length){
@@ -1634,7 +1634,7 @@ function exportReport(){
       return '<div style="margin-bottom:6px;font-size:12px"><strong style="color:#2a5fa5">'+p.group+':</strong> '+
         'Next predicted event: <strong>'+p.next+'</strong> &nbsp;&middot;&nbsp; '+
         '70% CI: '+p.ci_lo+' &ndash; '+p.ci_hi+' &nbsp;&middot;&nbsp; '+
-        'Location: '+(p.hot_state==='DC'?'Washington DC':'Montgomery Co., MD')+'</div>';
+        'Location: '+(p.hot_place?p.hot_place+' ('+p.hot_state+')':(p.hot_state==='DC'?'Washington DC':'Montgomery Co., MD'))+'</div>';
     }).join('')+
 
     '<div class="footer">'+
