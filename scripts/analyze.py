@@ -35,6 +35,9 @@ design: every run recomputes cleanly from whatever is in events.json.
 import json
 import os
 import math
+import time
+import urllib.request
+import urllib.parse
 from collections import defaultdict, Counter
 from datetime import datetime, timedelta, timezone
 
@@ -78,6 +81,54 @@ GY_MIN_YEAR = 2023       # yearly group breakdown window (confirmed via ground t
 CAL_MIN_DATE = "2022-01-01"  # calendar heatmap window (confirmed via ground truth)
 KM25_MIN_YEAR = 2025     # KM_25 hotspot subset ("2025+ events")
 KMEANS_K = 5
+
+
+_GEOCODE_CACHE = {}
+_NOMINATIM_UA = "dc-montco-hate-crime-dashboard/1.0 (https://github.com/distovertime/dc-montco-hate-crime)"
+
+
+def reverse_geocode(lat, lon):
+    """Reverse-geocode a lat/lon to a human-readable neighborhood/city name
+    via OpenStreetMap's Nominatim (free, no API key). Results are cached by
+    rounding to 2 decimal places (~1.1km) since cluster/hotspot centroids
+    from nearby areas will often collapse to the same cache entry, keeping
+    the number of live requests down.
+
+    Respects Nominatim's usage policy: max 1 request/second, identifying
+    User-Agent. A failed or errored lookup returns None rather than raising,
+    so one bad geocode can't take down the whole weekly pipeline run.
+    """
+    key = (round(lat, 2), round(lon, 2))
+    if key in _GEOCODE_CACHE:
+        return _GEOCODE_CACHE[key]
+
+    params = {
+        "format": "jsonv2",
+        "lat": str(lat),
+        "lon": str(lon),
+        "zoom": "14",
+        "addressdetails": "1",
+    }
+    url = "https://nominatim.openstreetmap.org/reverse?" + urllib.parse.urlencode(params)
+    place = None
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": _NOMINATIM_UA})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        addr = data.get("address", {})
+        # Preference order: most specific human-recognizable area first.
+        for field in ("neighbourhood", "suburb", "quarter", "town", "village", "city", "county"):
+            if addr.get(field):
+                place = addr[field]
+                break
+    except Exception as e:
+        print(f"  reverse_geocode({lat},{lon}) failed: {e}")
+        place = None
+    finally:
+        time.sleep(1.0)  # Nominatim usage policy: max 1 request/second
+
+    _GEOCODE_CACHE[key] = place
+    return place
 
 
 def haversine_km(lat1, lon1, lat2, lon2):
@@ -175,11 +226,13 @@ def kmeans_hotspots(events, k=KMEANS_K):
         center = km.cluster_centers_[i]
         group_counts = Counter(m["group"] for m in members)
         top_group = group_counts.most_common(1)[0][0]
+        place = reverse_geocode(float(center[0]), float(center[1]))
         hotspots.append({
             "lat": round(float(center[0]), 5),
             "lon": round(float(center[1]), 5),
             "events": len(members),
             "top_group": top_group,
+            "place": place,
         })
     hotspots.sort(key=lambda h: -h["events"])
     return hotspots
@@ -215,6 +268,7 @@ def _predict_one(evs_sorted):
     # but now actually derived from the data instead of static).
     n = len(evs_sorted)
     confidence = min(95, round(50 + min(n, 200) / 200 * 45))
+    hot_place = reverse_geocode(lat_c, lon_c)
 
     return {
         "last": last_date.strftime("%Y-%m-%d"),
@@ -226,6 +280,7 @@ def _predict_one(evs_sorted):
         "hot_lat": round(lat_c, 5),
         "hot_lon": round(lon_c, 5),
         "hot_state": top_state,
+        "hot_place": hot_place,
         "confidence": confidence,
     }
 

@@ -601,6 +601,18 @@ function render(){
       :(S.groups&&S.groups.size>0)
         ?cdata.filter(function(c){return S.groups.has(c.group);})
         :cdata;
+    // Date-range filter: show a cluster if its active date span overlaps
+    // the selected range at all (clusters are precomputed spans, not single
+    // dates, so we can't just compare equality).
+    if(S.dateFrom) cls=cls.filter(function(c){return c.end>=S.dateFrom;});
+    if(S.dateTo) cls=cls.filter(function(c){return c.start<=S.dateTo;});
+    if(S.selDates&&S.selDates.size>0){
+      cls=cls.filter(function(c){
+        var arr=Array.from(S.selDates);
+        for(var i=0;i<arr.length;i++){ if(arr[i]>=c.start&&arr[i]<=c.end) return true; }
+        return false;
+      });
+    }
     var zoom=map.getZoom();
     var showEvents=(zoom>=12);
     cls.forEach(function(c){
@@ -1072,7 +1084,7 @@ function renderPredCards(){
     var isOverall=p.group==='Overall';
     var color=isOverall?'var(--amber)':gc(p.group);
     var where=isOverall?'Region-wide \u00b7 DC / Montgomery Co.':
-      regionLabel(p.hot_lat,p.hot_lon)+' ('+p.hot_state+')';
+      (p.hot_place||regionLabel(p.hot_lat,p.hot_lon))+' ('+p.hot_state+')';
     var meta='Last: '+fmtShortDate(p.last)+' \u00b7 Gap: '+p.gap+' days'+(isOverall?'':' \u00b7 '+p.n+' events');
     return '<div class="pred-card" onclick="linkCard(\''+p.group+'\',this)">'+
       '<div class="pred-grp" style="color:'+color+'">'+p.group+'</div>'+
@@ -1086,7 +1098,7 @@ function renderPredCards(){
 }
 function kmBar(id,data){
   const valid=data.filter(function(d){return d.lat>38.5&&d.lat<39.5&&d.lon>-78.5&&d.lon<-76.5;});
-  const lbls=valid.map(function(d){return d.top_group+' - '+regionLabel(d.lat,d.lon);});
+  const lbls=valid.map(function(d){return d.top_group+' - '+(d.place||regionLabel(d.lat,d.lon));});
   new Chart(document.getElementById(id),{
     type:'bar',
     data:{labels:lbls,datasets:[{label:'Events',data:valid.map(function(d){return d.events;}),
