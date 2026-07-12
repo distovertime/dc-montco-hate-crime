@@ -712,7 +712,7 @@ function evPopGroup(grp){
 }
 function evPop(e){ return evPopGroup([e]); }
 function clPop(c){
-  return '<div style="font-size:12px;line-height:1.8;padding:2px"><b style="color:'+gc(c.group)+'">'+c.group+' cluster</b><br>'+c.events+' events \u00b7 '+c.start+' \u2192 '+c.end+'<br>'+c.days+' days \u00b7 '+c.state+'<br>Top offense: '+c.offense+'<br>Avg severity: '+c.sev.toFixed(1)+'/10<br><span style="color:#5a6070;font-size:10px">Zoom to 13+ to see individual events</span></div>';
+  return '<div style="font-size:12px;line-height:1.8;padding:2px"><b style="color:'+gc(c.group)+'">'+c.group+' cluster</b><br>'+c.events+' events \u00b7 '+c.start+' \u2192 '+c.end+'<br>'+c.days+' days \u00b7 '+c.state+'<br>Top offense: '+c.offense+'<br>Avg severity: '+(c.sev!=null?c.sev.toFixed(1):'N/A')+'/10<br><span style="color:#5a6070;font-size:10px">Zoom to 13+ to see individual events</span></div>';
 }
 
 // ── MAP CONTROLS ──────────────────────────────────────────────────────────────
@@ -982,7 +982,7 @@ function renderClusters(data){
       '<td>'+c.start+'</td><td>'+c.end+'</td><td>'+c.days+'d</td>'+
       '<td><span class="badge '+(c.state==='DC'?'badge-dc':'badge-md')+'">'+c.state+'</span></td>'+
       '<td style="color:var(--text2)">'+c.offense+'</td>'+
-      '<td><span class="sev-pill" style="background:'+sc+'22;color:'+sc+'">'+c.sev.toFixed(1)+'</span></td>';
+      '<td><span class="sev-pill" style="background:'+sc+'22;color:'+sc+'">'+(c.sev!=null?c.sev.toFixed(1):'N/A')+'</span></td>';
     tbody.appendChild(tr);
   });
 }
