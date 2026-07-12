@@ -245,9 +245,22 @@ def main():
         events.extend(clean_mcpd_record(rec))
 
     # Drop events with no usable location or date - can't be mapped/analyzed.
+    # Also drop events whose coordinates fall well outside the DC/Montgomery
+    # County area: some source records use (0,0) as a "geocoding failed"
+    # placeholder instead of a true null, and isolated bad records can have
+    # sign/parsing errors (e.g. positive instead of negative longitude).
+    # This is a real DC/MD bounding box with generous padding, not the
+    # literal city limits, so it won't clip legitimate edge-of-county events.
+    LAT_MIN, LAT_MAX = 38.0, 40.0
+    LON_MIN, LON_MAX = -78.5, -76.0
+
+    def in_region(e):
+        return LAT_MIN <= e["lat"] <= LAT_MAX and LON_MIN <= e["lon"] <= LON_MAX
+
     clean_events = [
         e for e in events
         if e.get("date") and e.get("lat") is not None and e.get("lon") is not None
+        and in_region(e)
     ]
     dropped = len(events) - len(clean_events)
 
