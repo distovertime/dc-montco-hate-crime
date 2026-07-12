@@ -441,8 +441,8 @@ let GROUPS, ADDR_LUT, OFF_LUT, EV_RAW, C3, C5, KM_ALL, KM_25, PREDS, RISK,
 
 async function loadDashboardData(){
   const [eventsResp, analyticsResp] = await Promise.all([
-    fetch('https://raw.githubusercontent.com/distovertime/dc-montco-hate-crime/main/data/events.json'),
-    fetch('https://raw.githubusercontent.com/distovertime/dc-montco-hate-crime/main/data/analytics.json')
+    fetch('data/events.json'),
+    fetch('data/analytics.json')
   ]);
   const events = await eventsResp.json();
   const analytics = await analyticsResp.json();
