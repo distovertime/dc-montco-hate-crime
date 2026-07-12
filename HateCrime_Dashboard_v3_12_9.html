@@ -444,6 +444,12 @@ async function loadDashboardData(){
     fetch('data/events.json'),
     fetch('data/analytics.json')
   ]);
+  if (!eventsResp.ok) {
+    throw new Error('data/events.json request failed: HTTP ' + eventsResp.status + ' ' + eventsResp.statusText + ' (URL: ' + eventsResp.url + ')');
+  }
+  if (!analyticsResp.ok) {
+    throw new Error('data/analytics.json request failed: HTTP ' + analyticsResp.status + ' ' + analyticsResp.statusText + ' (URL: ' + analyticsResp.url + ')');
+  }
   const events = await eventsResp.json();
   const analytics = await analyticsResp.json();
 
@@ -1705,9 +1711,25 @@ window.toggleGrpBtn = toggleGrpBtn;
 window.togglePlay = togglePlay;
 }
 
-loadDashboardData().then(initDashboard).catch(function(err){
-  console.error('Failed to load dashboard data:', err);
-  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#c00">Failed to load dashboard data. Please check that data/events.json and data/analytics.json are present and try again.</div>';
+function showFatalError(title, err){
+  console.error(title, err);
+  var msg = (err && err.message) ? err.message : String(err);
+  var stack = (err && err.stack) ? err.stack : '';
+  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:#c00;max-width:900px">'+
+    '<h2 style="margin-top:0">'+title+'</h2>'+
+    '<div style="font-family:monospace;white-space:pre-wrap;background:#fff3f3;border:1px solid #e0b0b0;border-radius:6px;padding:16px;font-size:13px;color:#600">'+
+    msg + (stack ? '\n\n' + stack : '') +
+    '</div></div>';
+}
+
+loadDashboardData().then(function(){
+  try {
+    initDashboard();
+  } catch(err) {
+    showFatalError('Dashboard failed to render (data loaded fine)', err);
+  }
+}).catch(function(err){
+  showFatalError('Failed to load dashboard data', err);
 });
 </script>
 </body>
