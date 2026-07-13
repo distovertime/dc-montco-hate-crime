@@ -141,6 +141,8 @@ def main():
             merged["address_street"] = crime.get("address_street")
             merged["street_type"] = crime.get("street_type")
             merged["crime_district"] = crime.get("district")
+            merged["city"] = crime.get("city")
+            merged["place"] = crime.get("place")
             merged["_crime_match"] = True
         joined.append(merged)
 

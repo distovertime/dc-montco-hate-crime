@@ -393,6 +393,40 @@ def calendar_daily_counts(events):
     return dict(counts)
 
 
+def city_counts(events):
+    """City breakdown table, matching the Tableau dashboard's City/No. of
+    Events list. DC contributes a single 'Washington' row (no separate city
+    field in that source); Montgomery County events use the real city field
+    from the Crime dataset join."""
+    counts = Counter()
+    for e in events:
+        city = e.get("city") or "Not Reported"
+        counts[(city, e["state"])] += 1
+    rows = [{"city": city, "state": state, "events": n} for (city, state), n in counts.items()]
+    rows.sort(key=lambda r: -r["events"])
+    return rows
+
+
+def group_state_counts(events):
+    """Group x DC/MD x Grand Total cross-tab of raw event counts, matching
+    the Tableau dashboard's second table (the risk/coefficient table is
+    already covered by risk_scores() above)."""
+    counts = defaultdict(lambda: {"dc": 0, "md": 0})
+    for e in events:
+        key = e["group"]
+        if e["state"] == "DC":
+            counts[key]["dc"] += 1
+        else:
+            counts[key]["md"] += 1
+    rows = []
+    for group, c in counts.items():
+        rows.append({
+            "group": group, "dc": c["dc"], "md": c["md"], "total": c["dc"] + c["md"],
+        })
+    rows.sort(key=lambda r: -r["total"])
+    return rows
+
+
 def subgroup_breakdowns(events):
     """Compute Jewish (Israeli/ethnic vs religious) and Asian (per-ethnicity)
     breakdowns from DC's raw TARGETED_GROUP field. Only DC records carry
@@ -456,8 +490,11 @@ def main():
     stacked, stacked_years = stacked_from_gy(gy_data)
     offense_grp = offense_breakdown(events)
     cal_data = calendar_daily_counts(events)
+    cities = city_counts(events)
+    group_states = group_state_counts(events)
     print(f"GY_DATA groups: {len(gy_data)}, STACKED years: {stacked_years}")
     print(f"OFFENSE_GRP groups: {len(offense_grp)}, CAL_DATA days: {len(cal_data)}")
+    print(f"City breakdown rows: {len(cities)}, Group/state rows: {len(group_states)}")
 
     analytics = {
         "c3": c3, "c5": c5,
@@ -467,6 +504,7 @@ def main():
         "jewish_bd": jewish_bd, "asian_bd": asian_bd,
         "gy_data": gy_data, "stacked": stacked, "stacked_years": stacked_years,
         "offense_grp": offense_grp, "cal_data": cal_data,
+        "cities": cities, "group_states": group_states,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 

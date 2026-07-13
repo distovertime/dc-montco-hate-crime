@@ -164,6 +164,10 @@ def clean_dc_record(rec):
             "subgroup_raw": targeted_group_raw,
             "state": "DC",
             "address": address,
+            "city": "Washington",  # DC has no separate city field; matches
+                                   # the Tableau dashboard's own convention
+                                   # of treating all of DC as one city row.
+            "place": None,  # not available in the DC source data
             "offense": offense,
             "severity": score_offense(offense),
         })
@@ -189,15 +193,19 @@ def clean_mcpd_record(rec):
         rec.get("address_number"), rec.get("address_street"), rec.get("street_type")
     ]
     address = " ".join(p for p in address_parts if p) or None
+    city = rec.get("city")
+    place = rec.get("place")
 
-    bias_1 = rec.get("bias_code") or rec.get("bias")
+    bias_1 = rec.get("bias_code")
     bias_2 = rec.get("bias_code_2")
     # NOTE: the Socrata field literally named "bias" is confusingly the
     # OFFENSE-type description ("Vandalism", "Verbal Intimidation/Simple
     # Assault", etc.) per the dataset's own column description ("Describes
     # how the bias was manifested by the offender") - confirmed against the
     # live schema. "bias_code"/"bias_code_2" are the actual bias/group
-    # fields, handled separately above.
+    # fields. Do NOT fall back to "bias" here - it's offense text, not a
+    # group label, and would corrupt group assignment if bias_code is ever
+    # blank.
     offense = rec.get("bias")
 
     raw_labels = []
@@ -218,6 +226,8 @@ def clean_mcpd_record(rec):
             "subgroup_raw": None,  # subgroup detail only captured on DC side
             "state": "MD",
             "address": address,
+            "city": city,
+            "place": place,
             "offense": offense,
             "severity": score_offense(offense),
         })
