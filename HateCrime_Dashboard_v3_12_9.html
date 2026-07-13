@@ -102,6 +102,20 @@ h1{font-size:24px;font-weight:600;line-height:1.2}
 
 
 /* DUAL RANGE HANDLE */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;user-select:none}
+.cal-dow{font-size:10px;color:var(--text3);text-align:center;padding:4px 0 6px;text-transform:uppercase;letter-spacing:0.05em}
+.cal-day{aspect-ratio:1;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:11px;position:relative;border:1.5px solid transparent;color:#fff;transition:border-color .1s}
+.cal-day:hover{border-color:rgba(255,255,255,0.5)}
+.cal-day.selected{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+.cal-day.empty{cursor:default;background:transparent!important}
+.cal-day .cd-num{font-weight:600;line-height:1.2}
+.cal-day .cd-count{font-size:9px;opacity:0.9;line-height:1.2}
+.cal-event-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:12px;line-height:1.7}
+.cal-event-card .ce-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
+.cal-event-card .ce-date{font-weight:600;color:var(--text2)}
+.cal-event-card .ce-group{font-weight:600}
+.cal-event-card .ce-detail{color:var(--text3);font-size:11px}
+.cal-empty-msg{font-size:12px;color:var(--text3);padding:10px 2px}
 .range-handle{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:28px;background:var(--bg2);border:1.5px solid var(--blue);border-radius:5px;cursor:ew-resize;display:flex;align-items:center;justify-content:center;gap:2px;z-index:10;transition:border-color .15s;box-shadow:0 2px 6px rgba(0,0,0,0.4)}
 .range-handle:hover,.range-handle.dragging{border-color:#85B7EB;background:var(--bg3)}
 .handle-bar{width:2px;height:10px;background:var(--border2);border-radius:1px}
@@ -263,18 +277,22 @@ kbd{font-family:inherit}
   </div>
 
 <div class="section">
-  <div class="slabel">Event calendar &middot; click days to filter map &middot; multi-select supported</div>
+  <div class="slabel">Event calendar &middot; click a day to filter map &middot; shift+click to add days &middot; drag for a range</div>
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-      <div style="font-size:11px;color:var(--text3)">Jan 2012 &rarr; Mar 2026 &nbsp;&middot;&nbsp; Bar height = event volume &nbsp;&middot;&nbsp; <strong style="color:var(--text2)">Click</strong> a day to isolate it &nbsp;&middot;&nbsp; <strong style="color:var(--text2)">Shift+click</strong> to add more days &nbsp;&middot;&nbsp; <strong style="color:var(--text2)">Drag</strong> to select a range</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="sbtn" onclick="calNavMonth(-1)">&larr;</button>
+        <div id="calMonthLabel" style="font-size:13px;font-weight:600;min-width:150px;text-align:center"></div>
+        <button class="sbtn" onclick="calNavMonth(1)">&rarr;</button>
+        <button class="sbtn" onclick="calJumpToLatest()">Latest</button>
+      </div>
       <div style="display:flex;gap:6px;align-items:center">
         <span id="calSelCount" style="font-size:11px;color:var(--text2)"></span>
         <button class="sbtn" onclick="clearCalSel()">Clear selection</button>
       </div>
     </div>
-    <div id="calStrip" style="position:relative;width:100%;height:72px;cursor:crosshair;user-select:none"></div>
-    <div id="calMonths" style="display:flex;justify-content:space-between;margin-top:3px;padding:0 1px"></div>
-    <div id="calTooltip" style="font-size:11px;color:var(--text2);margin-top:4px;min-height:16px;text-align:center"></div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div id="calEventCards"></div>
   </div>
 </div>
 
@@ -419,7 +437,7 @@ kbd{font-family:inherit}
 // ── DATA (loaded at runtime from data/events.json + data/analytics.json) ──────
 let GROUPS, ADDR_LUT, OFF_LUT, EV_RAW, C3, C5, KM_ALL, KM_25, PREDS, RISK,
     MONTHLY, JEWISH_BD, ASIAN_BD, OFFENSE_GRP, GY_DATA, STACKED, STACKED_YEARS, CAL_DATA,
-    CITIES, GROUP_STATES;
+    CITIES, GROUP_STATES, RAW_EVENTS;
 
 async function loadDashboardData(){
   const [eventsResp, analyticsResp] = await Promise.all([
@@ -434,6 +452,7 @@ async function loadDashboardData(){
   }
   const events = await eventsResp.json();
   const analytics = await analyticsResp.json();
+  RAW_EVENTS = events;
 
   // Rebuild lookup tables from the flat event list.
   const groupSet = new Set(), addrSet = new Set(), offSet = new Set();
@@ -513,7 +532,7 @@ function evOff(e){return (e[9]>=0&&e[9]<OFF_LUT.length)?OFF_LUT[e[9]]:'';}
 const ALL_DATES=[...new Set(EV_RAW.map(e=>e[0]))].sort();
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-const S={layer:'all',group:'',groups:new Set(),selectedClusterKey:null,dateFrom:null,dateTo:null,dateFilter:null,selDates:new Set(),polygon:null,clThr:3};
+const S={layer:'all',group:'',groups:new Set(),selectedClusterKey:null,dateFrom:null,dateTo:null,dateFilter:null,selDates:new Set(),polygon:null,clThr:3,calViewMonth:null};
 
 // ── MAP ───────────────────────────────────────────────────────────────────────
 const map=L.map('map',{center:[39.02,-77.07],zoom:11,preferCanvas:true});
@@ -1181,6 +1200,129 @@ new Chart(document.getElementById('jewishOffChart'),{
 });
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
+function calColorForCount(n,max){
+  if(!n) return 'var(--bg3)';
+  var t=Math.min(1,n/Math.max(1,max));
+  var r=Math.round(45+t*195), g=Math.round(85-t*35), b=Math.round(150-t*115);
+  return 'rgb('+r+','+g+','+b+')';
+}
+function calMonthInfo(ym){
+  var parts=ym.split('-');
+  var y=+parts[0], m=+parts[1];
+  var daysInMonth=new Date(y,m,0).getDate();
+  var startDow=new Date(y,m-1,1).getDay();
+  return {y:y,m:m,daysInMonth:daysInMonth,startDow:startDow};
+}
+function calDateStr(y,m,d){
+  return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+function calAllDates(){
+  return Object.keys(CAL_DATA).sort();
+}
+function calDefaultMonth(){
+  var dates=calAllDates();
+  return dates.length?dates[dates.length-1].slice(0,7):new Date().toISOString().slice(0,7);
+}
+var _calDragStart=null, _calDragging=false;
+
+function renderCalendarGrid(){
+  var grid=document.getElementById('calGrid');
+  if(!grid) return;
+  if(!S.calViewMonth) S.calViewMonth=calDefaultMonth();
+  var info=calMonthInfo(S.calViewMonth);
+  var maxCount=1;
+  for(var d=1;d<=info.daysInMonth;d++){
+    maxCount=Math.max(maxCount,CAL_DATA[calDateStr(info.y,info.m,d)]||0);
+  }
+  var html='';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(dow){
+    html+='<div class="cal-dow">'+dow+'</div>';
+  });
+  for(var i=0;i<info.startDow;i++) html+='<div class="cal-day empty"></div>';
+  for(var d=1;d<=info.daysInMonth;d++){
+    var ds=calDateStr(info.y,info.m,d);
+    var cnt=CAL_DATA[ds]||0;
+    var sel=S.selDates.has(ds);
+    var bg=calColorForCount(cnt,maxCount);
+    html+='<div class="cal-day'+(sel?' selected':'')+'" data-date="'+ds+'" style="background:'+bg+'" '+
+      'onmousedown="calDayMouseDown(event,\''+ds+'\')" onmouseup="calDayMouseUp(event,\''+ds+'\')" '+
+      'onmouseenter="calDayMouseEnter(event,\''+ds+'\')" title="'+ds+' \u00b7 '+cnt+' events">'+
+      '<div class="cd-num">'+d+'</div>'+(cnt?'<div class="cd-count">'+cnt+'</div>':'')+
+    '</div>';
+  }
+  grid.innerHTML=html;
+  var lbl=document.getElementById('calMonthLabel');
+  if(lbl) lbl.textContent=new Date(info.y,info.m-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  var selCount=document.getElementById('calSelCount');
+  if(selCount){
+    var n=S.selDates.size;
+    selCount.textContent=n===0?'':(n===1?'1 day selected':n+' days selected');
+  }
+}
+function calNavMonth(delta){
+  if(!S.calViewMonth) S.calViewMonth=calDefaultMonth();
+  var info=calMonthInfo(S.calViewMonth);
+  var m=info.m+delta, y=info.y;
+  if(m<1){m=12;y--;} if(m>12){m=1;y++;}
+  S.calViewMonth=y+'-'+String(m).padStart(2,'0');
+  renderCalendarGrid();
+}
+function calJumpToLatest(){
+  S.calViewMonth=calDefaultMonth();
+  renderCalendarGrid();
+}
+function calDayMouseDown(e,ds){
+  _calDragStart=ds; _calDragging=false;
+}
+function calDayMouseEnter(e,ds){
+  if(_calDragStart && e.buttons===1 && ds!==_calDragStart) _calDragging=true;
+}
+function calDayMouseUp(e,ds){
+  if(_calDragStart===null) return;
+  if(!_calDragging){
+    if(e.shiftKey){
+      if(S.selDates.has(ds)) S.selDates.delete(ds); else S.selDates.add(ds);
+    } else {
+      if(S.selDates.size===1 && S.selDates.has(ds)) S.selDates.clear();
+      else { S.selDates.clear(); S.selDates.add(ds); }
+    }
+  } else {
+    var lo=_calDragStart<ds?_calDragStart:ds;
+    var hi=_calDragStart<ds?ds:_calDragStart;
+    if(!e.shiftKey) S.selDates.clear();
+    var info=calMonthInfo(S.calViewMonth);
+    for(var d=1;d<=info.daysInMonth;d++){
+      var cur=calDateStr(info.y,info.m,d);
+      if(cur>=lo && cur<=hi) S.selDates.add(cur);
+    }
+  }
+  _calDragStart=null; _calDragging=false;
+  renderCalendarGrid();
+  renderCalEventCards();
+  render();
+}
+function renderCalEventCards(){
+  var el=document.getElementById('calEventCards');
+  if(!el||!RAW_EVENTS) return;
+  if(S.selDates.size===0){ el.innerHTML=''; return; }
+  var selDates=Array.from(S.selDates).sort();
+  var matches=RAW_EVENTS.filter(function(e){return S.selDates.has(e.date);});
+  matches.sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
+  if(!matches.length){
+    el.innerHTML='<div class="cal-empty-msg">No events on '+(selDates.length>1?'these days':selDates[0])+'.</div>';
+    return;
+  }
+  el.innerHTML=matches.map(function(e){
+    var loc=e.place?(e.city?e.place+', '+e.city:e.place):(e.city||e.address||'');
+    return '<div class="cal-event-card">'+
+      '<div class="ce-head"><span class="ce-date">'+e.date+'</span>'+
+      '<span class="ce-group" style="color:'+gc(e.group)+'">'+e.group+'</span></div>'+
+      '<div class="ce-detail">'+(e.offense||'Offense not specified')+' &middot; '+e.state+'</div>'+
+      '<div class="ce-detail">'+(e.address||'')+(loc?' &middot; '+loc:'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+
 var drawCal=null;
 function buildCal(){
   var strip=document.getElementById('calStrip');
@@ -1356,12 +1498,16 @@ function buildCal(){
 
 function clearCalSel(){
   S.selDates.clear();
-  document.getElementById('calSelCount').textContent='';
-  document.getElementById('calTooltip').textContent='';
+  var selCount=document.getElementById('calSelCount');
+  if(selCount) selCount.textContent='';
+  renderCalendarGrid();
+  renderCalEventCards();
   render();
 }
 
 buildCal();
+renderCalendarGrid();
+renderCalEventCards();
 // ── DRILL DOWN ────────────────────────────────────────────────────────────────
 let drillCh=null;
 function openDrill(group){
@@ -1746,6 +1892,11 @@ function linkGroup(g){ setGroup(g); document.getElementById('map').scrollIntoVie
 
 // Expose functions referenced by inline onclick handlers to the global scope.
 window.clearCalSel = clearCalSel;
+window.calNavMonth = calNavMonth;
+window.calJumpToLatest = calJumpToLatest;
+window.calDayMouseDown = calDayMouseDown;
+window.calDayMouseEnter = calDayMouseEnter;
+window.calDayMouseUp = calDayMouseUp;
 window.clearPoly = clearPoly;
 window.clearProximity = clearProximity;
 window.closeDrill = closeDrill;
