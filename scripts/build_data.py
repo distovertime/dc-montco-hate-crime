@@ -194,6 +194,7 @@ def clean_mcpd_record(rec):
     ]
     address = " ".join(p for p in address_parts if p) or None
     city = rec.get("city")
+    city = city.title() if city else None
     place = rec.get("place")
 
     bias_1 = rec.get("bias_code")

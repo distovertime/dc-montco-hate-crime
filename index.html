@@ -327,6 +327,20 @@ kbd{font-family:inherit}
 </div>
 
 <div class="section">
+  <div class="slabel">Group &amp; location breakdown</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Events by group &middot; DC / Montgomery Co., MD / Total</div>
+      <div id="groupStateTable" style="max-height:420px;overflow-y:auto"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Events by city</div>
+      <div id="cityTable" style="max-height:420px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
   <div class="slabel">Spatio-temporal clusters &middot; click any row to fly map to that cluster</div>
   <div class="note-box" style="margin-bottom:12px">DBSCAN &middot; &epsilon;=1km &middot; 30-day window. A cluster indicates repeated incidents against the same group in a small area over a short period &mdash; consistent with a single actor or coordinated activity. In <em>Clusters only</em> mode, zoom in to level 13+ to see individual events within each cluster.</div>
   <div class="tab-row">
@@ -404,7 +418,8 @@ kbd{font-family:inherit}
 // ── DATA ─────────────────────────────────────────────────────────────────────
 // ── DATA (loaded at runtime from data/events.json + data/analytics.json) ──────
 let GROUPS, ADDR_LUT, OFF_LUT, EV_RAW, C3, C5, KM_ALL, KM_25, PREDS, RISK,
-    MONTHLY, JEWISH_BD, ASIAN_BD, OFFENSE_GRP, GY_DATA, STACKED, STACKED_YEARS, CAL_DATA;
+    MONTHLY, JEWISH_BD, ASIAN_BD, OFFENSE_GRP, GY_DATA, STACKED, STACKED_YEARS, CAL_DATA,
+    CITIES, GROUP_STATES;
 
 async function loadDashboardData(){
   const [eventsResp, analyticsResp] = await Promise.all([
@@ -466,6 +481,8 @@ async function loadDashboardData(){
   STACKED = analytics.stacked || {};
   STACKED_YEARS = analytics.stacked_years || [];
   CAL_DATA = analytics.cal_data || {};
+  CITIES = analytics.cities || [];
+  GROUP_STATES = analytics.group_states || [];
 }
 
 
@@ -1076,6 +1093,33 @@ function fmtShortDate(iso){
   var d=new Date(iso+'T00:00:00');
   return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 }
+function renderGroupStateTable(){
+  var el=document.getElementById('groupStateTable');
+  if(!el||!GROUP_STATES) return;
+  var rows=GROUP_STATES.map(function(r){
+    return '<tr onclick="linkGroup(\''+r.group+'\')">'+
+      '<td style="color:'+gc(r.group)+'">'+r.group+'</td>'+
+      '<td style="text-align:right">'+r.dc.toLocaleString()+'</td>'+
+      '<td style="text-align:right">'+r.md.toLocaleString()+'</td>'+
+      '<td style="text-align:right;font-weight:600">'+r.total.toLocaleString()+'</td>'+
+    '</tr>';
+  }).join('');
+  el.innerHTML='<table class="ctable"><thead><tr>'+
+    '<th>Group targeted</th><th style="text-align:right">DC</th>'+
+    '<th style="text-align:right">MD</th><th style="text-align:right">Total</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+function renderCityTable(){
+  var el=document.getElementById('cityTable');
+  if(!el||!CITIES) return;
+  var rows=CITIES.map(function(r){
+    return '<tr><td>'+r.city+'</td><td style="color:var(--text3)">'+r.state+'</td>'+
+      '<td style="text-align:right">'+r.events.toLocaleString()+'</td></tr>';
+  }).join('');
+  el.innerHTML='<table class="ctable"><thead><tr>'+
+    '<th>City</th><th>State</th><th style="text-align:right">Events</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>';
+}
 function renderPredCards(){
   var grid=document.getElementById('predGrid');
   if(!grid||!PREDS||!PREDS.length) return;
@@ -1110,6 +1154,8 @@ function kmBar(id,data){
   });
 }
 renderPredCards();
+renderGroupStateTable();
+renderCityTable();
 kmBar('kmAllChart',KM_ALL);
 kmBar('km25Chart',KM_25);
 
