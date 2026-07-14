@@ -323,6 +323,7 @@ kbd{font-family:inherit}
       <div style="font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.6">Victimization rate per 100k &times; offense severity &times; current events factor &middot; normalized 0&ndash;100</div>
       <div id="riskBars"></div>
       <div class="note-box" style="margin-top:12px"><strong>X-factors applied:</strong> Jewish 1.8&times; (Israel-Gaza, campus unrest) &middot; Islamic 1.6&times; &middot; Transgender 1.5&times; (national legislation) &middot; Hispanic 1.3&times; &middot; Black, Asian, Homosexual 1.2&times;</div>
+      <div class="note-box" style="margin-top:8px"><strong>How to read this:</strong> event totals update automatically with every data refresh, so these scores always reflect the current dataset. Population denominators are a fixed reference snapshot, not a live demographic feed, so this is best read as a current-moment estimate rather than a trend adjusted for population change over time.</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px">
       <div class="card">
@@ -1048,10 +1049,40 @@ const ID_TEXT={
   'Transgender':'Transgender residents carry the <strong style="color:#F4C0D1">highest relative risk score (100)</strong>. ADW appears at 16% of incidents &mdash; highest of any group &mdash; with average severity 6.1/10. Small estimated population (40k) against a meaningful event count drives the elevated score.',
   'Hispanic':'Hispanic residents face <strong style="color:#FAC775">5.8 incidents per 100k</strong> with a 1.3x X-factor reflecting the immigration policy climate. Event volume has been <em>rising</em> since 2023 &mdash; the only top group showing a consistent upward trend through 2025.'
 };
+function genIdText(g){
+  var r = RISK.find(function(x){return x.group===g;});
+  var pred = PREDS.find(function(x){return x.group===g;});
+  var offs = OFFENSE_GRP[g]||[];
+  var color = RCOLS[g]||'#fff';
+  if(!r) return g+': not enough data in the current pull for a risk estimate.';
+  var topOff = offs[0];
+  var offPct = topOff ? Math.round(topOff.count/r.events*100) : null;
+  var trendText = '';
+  if(STACKED[g] && STACKED_YEARS.length>=2){
+    var vals = STACKED[g];
+    var curYear = new Date().getFullYear();
+    var lastIdx = vals.length-1, prevIdx=vals.length-2;
+    // If the most recent year is the current (partial) year, compare the
+    // two years before it instead - a partial year will always look like
+    // a decline against a full year, which would be a misleading claim.
+    if(STACKED_YEARS[lastIdx]===curYear && vals.length>=3){
+      lastIdx=vals.length-2; prevIdx=vals.length-3;
+    }
+    if(STACKED_YEARS[lastIdx]!==curYear || vals.length<3){
+      if(vals[lastIdx]>vals[prevIdx]) trendText = 'Event volume rose in '+STACKED_YEARS[lastIdx]+' versus '+STACKED_YEARS[prevIdx]+'. ';
+      else if(vals[lastIdx]<vals[prevIdx]) trendText = 'Event volume declined in '+STACKED_YEARS[lastIdx]+' versus '+STACKED_YEARS[prevIdx]+'. ';
+      else trendText = 'Event volume held steady between '+STACKED_YEARS[prevIdx]+' and '+STACKED_YEARS[lastIdx]+'. ';
+    }
+  }
+  var locText = (pred && pred.hot_place) ? (pred.hot_place+' ('+pred.hot_state+') is the current primary cluster area. ') : '';
+  return g+' residents show a victimization rate of <strong style="color:'+color+'">'+r.vr+' per 100k</strong> in this dataset (risk score '+r.score+'/100, '+r.events.toLocaleString()+' events). '+
+    (offPct!=null?topOff.offense+' accounts for about '+offPct+'% of incidents. ':'')+
+    trendText+locText;
+}
 function setId(btn,g){
   document.querySelectorAll('#idTabs .tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('idPanel').innerHTML='<div style="padding:2px 0">'+ID_TEXT[g]+'</div>';
+  document.getElementById('idPanel').innerHTML='<div style="padding:2px 0">'+genIdText(g)+'</div>';
 }
 setId(document.querySelector('#idTabs .tab'),'Jewish');
 

@@ -222,10 +222,13 @@ def clean_mcpd_record(rec):
     except (TypeError, ValueError):
         lat, lon = None, None
 
-    address_parts = [
-        rec.get("address_number"), rec.get("address_street"), rec.get("street_type")
-    ]
-    address = " ".join(p for p in address_parts if p) or None
+    address_number = rec.get("address_number")
+    street_parts = [rec.get("address_street"), rec.get("street_type")]
+    street_name = " ".join(p for p in street_parts if p)
+    if address_number and street_name:
+        address = f"{address_number} block of {street_name}"
+    else:
+        address = street_name or (str(address_number) if address_number else None)
     city = rec.get("city")
     city = city.title() if city else None
     city = CITY_NORMALIZE.get(city, city)
