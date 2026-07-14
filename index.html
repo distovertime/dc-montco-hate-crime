@@ -104,13 +104,13 @@ h1{font-size:24px;font-weight:600;line-height:1.2}
 /* DUAL RANGE HANDLE */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;user-select:none}
 .cal-dow{font-size:10px;color:var(--text3);text-align:center;padding:4px 0 6px;text-transform:uppercase;letter-spacing:0.05em}
-.cal-day{aspect-ratio:1;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:11px;position:relative;border:1.5px solid transparent;color:#fff;transition:border-color .1s}
+.cal-day{aspect-ratio:2.2;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:10px;position:relative;border:1.5px solid transparent;color:#fff;transition:border-color .1s}
 .cal-day:hover{border-color:rgba(255,255,255,0.5)}
 .cal-day.selected{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
 .cal-day.empty{cursor:default;background:transparent!important}
 .cal-day .cd-num{font-weight:600;line-height:1.2}
 .cal-day .cd-count{font-size:9px;opacity:0.9;line-height:1.2}
-.cal-event-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:12px;line-height:1.7}
+.cal-event-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:5px;padding:6px 10px;margin-bottom:5px;font-size:11px;line-height:1.4}
 .cal-event-card .ce-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
 .cal-event-card .ce-date{font-weight:600;color:var(--text2)}
 .cal-event-card .ce-group{font-weight:600}
@@ -292,7 +292,7 @@ kbd{font-family:inherit}
       </div>
     </div>
     <div id="calGrid" class="cal-grid"></div>
-    <div id="calEventCards"></div>
+    <div id="calEventCards" style="max-height:280px;overflow-y:auto;margin-top:10px"></div>
   </div>
 </div>
 
