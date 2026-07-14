@@ -207,6 +207,23 @@ CITY_NORMALIZE = {
 }
 
 
+def title_case_address(s):
+    """Like str.title(), but correct for street names: '16TH' -> '16th'
+    (not '16Th'). Only capitalizes a word's first letter if that word
+    actually starts with a letter; words starting with a digit (ordinals
+    like 16TH, 1ST, 3RD) are just lowercased instead."""
+    if not s:
+        return s
+    words = s.split(" ")
+    out = []
+    for w in words:
+        if w and w[0].isalpha():
+            out.append(w[0].upper() + w[1:].lower())
+        else:
+            out.append(w.lower())
+    return " ".join(out)
+
+
 def clean_mcpd_record(rec):
     """Normalize one joined MCPD bias-incident dict into 1+ events."""
     date_raw = rec.get("incident_date")
@@ -225,6 +242,7 @@ def clean_mcpd_record(rec):
     address_number = rec.get("address_number")
     street_parts = [rec.get("address_street"), rec.get("street_type")]
     street_name = " ".join(p for p in street_parts if p)
+    street_name = title_case_address(street_name)
     if address_number and street_name:
         address = f"{address_number} block of {street_name}"
     else:
