@@ -108,8 +108,9 @@ h1{font-size:24px;font-weight:600;line-height:1.2}
 .cal-day:hover{border-color:rgba(255,255,255,0.5)}
 .cal-day.selected{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
 .cal-day.empty{cursor:default;background:transparent!important}
-.cal-day .cd-num{font-weight:600;line-height:1.2}
-.cal-day .cd-count{font-size:9px;opacity:0.9;line-height:1.2}
+.cal-day .cd-num{font-weight:700;line-height:1.15;font-size:13px}
+.cal-day .cd-suffix{font-weight:400;font-size:8px;vertical-align:super;opacity:0.75}
+.cal-day .cd-count{font-size:9px;line-height:1.15;opacity:0.75;margin-top:1px}
 .cal-event-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:5px;padding:6px 10px;margin-bottom:5px;font-size:11px;line-height:1.4}
 .cal-event-card .ce-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
 .cal-event-card .ce-date{font-weight:600;color:var(--text2)}
@@ -1050,34 +1051,73 @@ const ID_TEXT={
   'Hispanic':'Hispanic residents face <strong style="color:#FAC775">5.8 incidents per 100k</strong> with a 1.3x X-factor reflecting the immigration policy climate. Event volume has been <em>rising</em> since 2023 &mdash; the only top group showing a consistent upward trend through 2025.'
 };
 function genIdText(g){
+  var DISPLAY_NAME = {'Homosexual':'Gay and lesbian'};
+  var displayName = DISPLAY_NAME[g] || g;
   var r = RISK.find(function(x){return x.group===g;});
   var pred = PREDS.find(function(x){return x.group===g;});
   var offs = OFFENSE_GRP[g]||[];
   var color = RCOLS[g]||'#fff';
   if(!r) return g+': not enough data in the current pull for a risk estimate.';
+
+  // Superlative check: is this group's rate the highest in the dataset?
+  var maxVr = Math.max.apply(null, RISK.map(function(x){return x.vr;}));
+  var isHighest = r.vr>=maxVr;
+
+  // State scope: is this mostly a DC story, an MD story, or both?
+  var gs = (typeof GROUP_STATES!=='undefined'?GROUP_STATES:[]).find(function(x){return x.group===g;});
+  var scopeText = 'across DC and Montgomery County, MD';
+  if(gs && gs.total>0){
+    var dcPct = gs.dc/gs.total;
+    if(dcPct>=0.8) scopeText='in DC specifically';
+    else if(dcPct<=0.2) scopeText='in Montgomery County, MD specifically';
+  }
+
+  var rateSentence = displayName+' residents face <strong style="color:'+color+'">'+r.vr+' incidents per 100k</strong> annually '+scopeText+
+    (isHighest?' &mdash; highest in this dataset.':'.');
+
+  var xfSentence = '';
+  if(r.xf && r.xf>1.0){
+    xfSentence = ' Risk elevated by '+(r.xf_reason||'contextual factors')+' ('+r.xf+'&times;).';
+  }
+
+  // Up to 2 real hotspot locations from KMeans hotspots dominated by this group.
+  var spots = (typeof KM_ALL!=='undefined'?KM_ALL:[]).filter(function(h){return h.top_group===g && h.place;}).slice(0,2);
+  var locSentence = '';
+  if(spots.length===1){
+    locSentence = ' '+spots[0].place+' is the primary cluster zone.';
+  } else if(spots.length===2){
+    locSentence = ' '+spots[0].place+' and '+spots[1].place+' are key cluster zones.';
+  } else if(pred && pred.hot_place){
+    locSentence = ' '+pred.hot_place+' ('+pred.hot_state+') is the current primary cluster area.';
+  }
+
   var topOff = offs[0];
   var offPct = topOff ? Math.round(topOff.count/r.events*100) : null;
-  var trendText = '';
+  var offSentence = offPct!=null ? ' Top offense: '+topOff.offense+' ('+offPct+'%).' : '';
+
+  // Trend: detect a clean peak year, or compare the two most recent complete years.
+  var trendSentence = '';
   if(STACKED[g] && STACKED_YEARS.length>=2){
     var vals = STACKED[g];
     var curYear = new Date().getFullYear();
-    var lastIdx = vals.length-1, prevIdx=vals.length-2;
-    // If the most recent year is the current (partial) year, compare the
-    // two years before it instead - a partial year will always look like
-    // a decline against a full year, which would be a misleading claim.
-    if(STACKED_YEARS[lastIdx]===curYear && vals.length>=3){
-      lastIdx=vals.length-2; prevIdx=vals.length-3;
-    }
-    if(STACKED_YEARS[lastIdx]!==curYear || vals.length<3){
-      if(vals[lastIdx]>vals[prevIdx]) trendText = 'Event volume rose in '+STACKED_YEARS[lastIdx]+' versus '+STACKED_YEARS[prevIdx]+'. ';
-      else if(vals[lastIdx]<vals[prevIdx]) trendText = 'Event volume declined in '+STACKED_YEARS[lastIdx]+' versus '+STACKED_YEARS[prevIdx]+'. ';
-      else trendText = 'Event volume held steady between '+STACKED_YEARS[prevIdx]+' and '+STACKED_YEARS[lastIdx]+'. ';
+    var completeIdx = STACKED_YEARS.map(function(y,i){return {y:y,v:vals[i],i:i};}).filter(function(x){return x.y!==curYear;});
+    if(completeIdx.length>=2){
+      var peak = completeIdx.reduce(function(a,b){return b.v>a.v?b:a;});
+      var lastIdx = completeIdx.length-1;
+      var isMonotonicRise = completeIdx.every(function(x,i){return i===0||x.v>=completeIdx[i-1].v;}) && completeIdx[lastIdx].v>completeIdx[0].v;
+      if(isMonotonicRise){
+        trendSentence = ' Event volume has been rising since '+completeIdx[0].y+'.';
+      } else if(peak.i!==lastIdx){
+        trendSentence = ' Event volume peaked in '+peak.y+'.';
+      } else {
+        var prev=completeIdx[lastIdx-1];
+        if(completeIdx[lastIdx].v>prev.v) trendSentence=' Event volume rose in '+completeIdx[lastIdx].y+' versus '+prev.y+'.';
+        else if(completeIdx[lastIdx].v<prev.v) trendSentence=' Event volume declined in '+completeIdx[lastIdx].y+' versus '+prev.y+'.';
+      }
     }
   }
-  var locText = (pred && pred.hot_place) ? (pred.hot_place+' ('+pred.hot_state+') is the current primary cluster area. ') : '';
-  return g+' residents show a victimization rate of <strong style="color:'+color+'">'+r.vr+' per 100k</strong> in this dataset (risk score '+r.score+'/100, '+r.events.toLocaleString()+' events). '+
-    (offPct!=null?topOff.offense+' accounts for about '+offPct+'% of incidents. ':'')+
-    trendText+locText;
+
+  return rateSentence+xfSentence+locSentence+offSentence+trendSentence;
 }
 function setId(btn,g){
   document.querySelectorAll('#idTabs .tab').forEach(t=>t.classList.remove('active'));
@@ -1244,6 +1284,11 @@ function calMonthInfo(ym){
   var startDow=new Date(y,m-1,1).getDay();
   return {y:y,m:m,daysInMonth:daysInMonth,startDow:startDow};
 }
+function ordinalSuffix(d){
+  var v=d%100;
+  if(v>=11&&v<=13) return 'th';
+  switch(d%10){case 1:return 'st';case 2:return 'nd';case 3:return 'rd';default:return 'th';}
+}
 function calDateStr(y,m,d){
   return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
 }
@@ -1278,7 +1323,7 @@ function renderCalendarGrid(){
     html+='<div class="cal-day'+(sel?' selected':'')+'" data-date="'+ds+'" style="background:'+bg+'" '+
       'onmousedown="calDayMouseDown(event,\''+ds+'\')" onmouseup="calDayMouseUp(event,\''+ds+'\')" '+
       'onmouseenter="calDayMouseEnter(event,\''+ds+'\')" title="'+ds+' \u00b7 '+cnt+' events">'+
-      '<div class="cd-num">'+d+'</div>'+(cnt?'<div class="cd-count">'+cnt+'</div>':'')+
+      '<div class="cd-num">'+d+'<span class="cd-suffix">'+ordinalSuffix(d)+'</span></div>'+(cnt?'<div class="cd-count">'+cnt+'</div>':'')+
     '</div>';
   }
   grid.innerHTML=html;

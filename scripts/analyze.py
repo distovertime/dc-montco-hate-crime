@@ -74,6 +74,19 @@ XF_REF = {
     "White": 1.0,
 }
 
+# Short human-readable reason for each group's X-factor, used in the
+# dashboard's generated narrative text.
+XF_REASONS = {
+    "Transgender": "national legislation and policy debate",
+    "Jewish": "the Israel-Gaza conflict and related campus unrest",
+    "Homosexual": "ongoing underreporting in bias-crime data generally",
+    "Islamic": "geopolitical tensions and Islamophobia trends",
+    "Black": "persistent underreporting in bias-crime data generally",
+    "Hispanic": "the immigration policy climate",
+    "Asian": "continued anti-Asian sentiment since the pandemic era",
+    "White": "baseline reference group",
+}
+
 DBSCAN_EPS_KM = 1.0      # spatial radius in km treated as "same area"
 DBSCAN_EPS_DAYS = 30     # temporal window in days treated as "same spell"
 PRED_MIN_YEAR = 2023     # inter-arrival model fit window ("2023+ data")
@@ -332,6 +345,7 @@ def risk_scores(events):
         rows.append({
             "group": group, "events": n, "sev": round(avg_sev, 1),
             "pop": pop, "vr": round(vr, 2), "xf": xf, "raw": round(raw, 2),
+            "xf_reason": XF_REASONS.get(group),
         })
 
     max_raw = max((r["raw"] for r in rows), default=1) or 1
