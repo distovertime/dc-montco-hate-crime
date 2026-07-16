@@ -329,23 +329,41 @@ def inter_arrival_predictions(events):
 
 
 def risk_scores(events):
-    by_group = defaultdict(list)
+    # "vr" is meant to be an average ANNUAL rate per 100k, but was
+    # previously computed from the full ~14-year cumulative event count,
+    # which inflates the numbers and mislabels a multi-year total as an
+    # annual figure. Fix: use only complete years from GY_MIN_YEAR onward
+    # (excluding the current, still-in-progress year) and divide by the
+    # number of complete years to get a genuine average-annual count.
+    cur_year = datetime.now(timezone.utc).year
+    recent_events = [e for e in events if GY_MIN_YEAR <= e["_date"].year < cur_year]
+    complete_years = sorted({e["_date"].year for e in recent_events})
+    num_years = len(complete_years) if complete_years else 1
+
+    by_group_all = defaultdict(list)
     for e in events:
-        by_group[e["group"]].append(e)
+        by_group_all[e["group"]].append(e)
+    by_group_recent = defaultdict(list)
+    for e in recent_events:
+        by_group_recent[e["group"]].append(e)
 
     rows = []
     for group, pop in POPULATION_REF.items():
-        evs = by_group.get(group, [])
-        n = len(evs)
-        sevs = [e["severity"] for e in evs if e["severity"] is not None]
+        evs_all = by_group_all.get(group, [])
+        evs_recent = by_group_recent.get(group, [])
+        n_total = len(evs_all)
+        avg_annual_n = len(evs_recent) / num_years
+        sevs = [e["severity"] for e in evs_all if e["severity"] is not None]
         avg_sev = sum(sevs) / len(sevs) if sevs else 0
         xf = XF_REF.get(group, 1.0)
-        vr = n / pop * 100000
+        vr = avg_annual_n / pop * 100000
         raw = vr * avg_sev * xf
         rows.append({
-            "group": group, "events": n, "sev": round(avg_sev, 1),
+            "group": group, "events": n_total, "sev": round(avg_sev, 1),
             "pop": pop, "vr": round(vr, 2), "xf": xf, "raw": round(raw, 2),
             "xf_reason": XF_REASONS.get(group),
+            "avg_annual_events": round(avg_annual_n, 1),
+            "years_covered": num_years,
         })
 
     max_raw = max((r["raw"] for r in rows), default=1) or 1
