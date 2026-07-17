@@ -339,10 +339,6 @@ kbd{font-family:inherit}
         </div>
         <div id="idPanel" style="font-size:12px;color:var(--text2);line-height:1.8"></div>
       </div>
-      <div class="card">
-        <div class="card-title">Asian community &middot; ethnicity breakdown (187 events)</div>
-        <div id="asianBars"></div>
-      </div>
     </div>
   </div>
 </div>
@@ -365,8 +361,8 @@ kbd{font-family:inherit}
   <div class="slabel">Spatio-temporal clusters &middot; click any row to fly map to that cluster</div>
   <div class="note-box" style="margin-bottom:12px">DBSCAN &middot; &epsilon;=1km &middot; 30-day window. A cluster indicates repeated incidents against the same group in a small area over a short period &mdash; consistent with a single actor or coordinated activity. In <em>Clusters only</em> mode, zoom in to level 13+ to see individual events within each cluster.</div>
   <div class="tab-row">
-    <div class="tab active" id="c3tab" onclick="showClusters(this,3)">All clusters &middot; &gt;3 events (77)</div>
-    <div class="tab" id="c5tab" onclick="showClusters(this,5)">High-confidence &middot; &gt;5 events (6)</div>
+    <div class="tab active" id="c3tab" onclick="showClusters(this,3)">All clusters &middot; &gt;3 events (<span id="c3tabCount">&hellip;</span>)</div>
+    <div class="tab" id="c5tab" onclick="showClusters(this,5)">High-confidence &middot; &gt;5 events (<span id="c5tabCount">&hellip;</span>)</div>
   </div>
   <table class="ctable">
     <thead><tr><th>Group</th><th>Events</th><th>Start</th><th>End</th><th>Span</th><th>State</th><th>Top offense</th><th>Avg sev.</th></tr></thead>
@@ -393,22 +389,6 @@ kbd{font-family:inherit}
 </div>
 
 
-
-<div class="section">
-  <div class="slabel">Jewish community &middot; motivation &amp; offense breakdown</div>
-  <div class="two-col">
-    <div class="card">
-      <div class="card-title">Religious vs. Israeli/ethnic motivation</div>
-      <div style="position:relative;height:180px"><canvas id="jewishPie"></canvas></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6">98% religion-motivated. 2% coded as Israeli/ethnic (21 events). Many religion-coded incidents may also carry ethnic dimensions not captured in the primary bias code.</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Top offenses against Jewish community</div>
-      <div style="position:relative;height:180px"><canvas id="jewishOffChart"></canvas></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6">Vandalism dominates at 44% &mdash; graffiti, defacement, destruction of property. Written/verbal intimidation ~20% combined.</div>
-    </div>
-  </div>
-</div>
 
 <div class="section">
   <div class="slabel">Methodology &amp; data notes</div>
@@ -1143,20 +1123,6 @@ function setId(btn,g){
 }
 setId(document.querySelector('#idTabs .tab'),'Jewish');
 
-// ── ASIAN BARS ────────────────────────────────────────────────────────────────
-const ab=document.getElementById('asianBars');
-const atot=ASIAN_BD.reduce(function(a,r){return a+r.count;},0);
-ASIAN_BD.forEach(function(r){
-  const pct=Math.round(r.count/atot*100);
-  const d=document.createElement('div');
-  d.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:5px';
-  d.innerHTML='<span style="font-size:11px;color:var(--text2);width:130px;flex-shrink:0">'+r.ethnicity+'</span>'+
-    '<div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">'+
-    '<div style="width:'+pct+'%;height:100%;background:#5DCAA5"></div></div>'+
-    '<span style="font-size:11px;color:var(--text3);width:55px;text-align:right">'+pct+'% ('+r.count+')</span>';
-  ab.appendChild(d);
-});
-
 // ── CHARTS ────────────────────────────────────────────────────────────────────
 new Chart(document.getElementById('monthlyChart'),{
   type:'line',
@@ -1259,6 +1225,8 @@ function updateOverviewStats(){
   setText('metricTotalEventsSub',minYear+' \u2013 '+maxLbl);
   setText('metricClusters',(C3||[]).length.toLocaleString());
   setText('metricHighConf',(C5||[]).length.toLocaleString());
+  setText('c3tabCount',(C3||[]).length.toLocaleString());
+  setText('c5tabCount',(C5||[]).length.toLocaleString());
   var overallPred=(PREDS||[]).find(function(p){return p.group==='Overall';});
   setText('metricMeanGap',overallPred?overallPred.gap+' days':'\u2013');
   setText('kmAllChartTitle','All years ('+minYear+'\u2013'+maxYear+')');
@@ -1302,27 +1270,6 @@ renderGroupStateTable();
 renderCityTable();
 kmBar('kmAllChart',KM_ALL);
 kmBar('km25Chart',KM_25);
-
-new Chart(document.getElementById('jewishPie'),{
-  type:'doughnut',
-  data:{labels:JEWISH_BD.map(function(j){return j.subtype+' ('+j.count+')';}),
-    datasets:[{data:JEWISH_BD.map(function(j){return j.count;}),
-      backgroundColor:['#378ADD','#EF9F27'],borderWidth:0}]},
-  options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
-    plugins:{legend:{labels:{color:TC,font:{size:11}},position:'bottom'}}}
-});
-
-const jo=OFFENSE_GRP['Jewish']||[];
-new Chart(document.getElementById('jewishOffChart'),{
-  type:'bar',
-  data:{labels:jo.map(function(r){return r.offense;}),
-    datasets:[{label:'Events',data:jo.map(function(r){return r.count;}),
-      backgroundColor:'#185FA5',borderWidth:0}]},
-  options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{display:false}},
-    scales:{x:{ticks:{color:TC,font:{size:10}},grid:{color:GC2}},
-            y:{ticks:{color:TC,font:{size:10}},grid:{color:GC2}}}}
-});
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 function calColorForCount(n,max){
