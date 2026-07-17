@@ -1253,7 +1253,7 @@ function renderPredCards(){
 }
 function kmBar(id,data){
   const valid=data.filter(function(d){return d.lat>38.5&&d.lat<39.5&&d.lon>-78.5&&d.lon<-76.5;});
-  const lbls=valid.map(function(d){return d.top_group+' - '+(d.place||regionLabel(d.lat,d.lon));});
+  const lbls=valid.map(function(d){return dispGroup(d.top_group)+' - '+(d.place||regionLabel(d.lat,d.lon));});
   new Chart(document.getElementById(id),{
     type:'bar',
     data:{labels:lbls,datasets:[{label:'Events',data:valid.map(function(d){return d.events;}),
