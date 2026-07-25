@@ -388,6 +388,13 @@ kbd{font-family:inherit}
   <div class="card"><div style="position:relative;height:190px"><canvas id="monthlyChart"></canvas></div></div>
 </div>
 
+<div class="section">
+  <div class="slabel">Data quality check &middot; automated, runs every pull</div>
+  <div class="card">
+    <div id="dataQualityPanel" style="font-size:12px;line-height:1.7"></div>
+  </div>
+</div>
+
 
 
 <div class="section">
@@ -399,6 +406,17 @@ kbd{font-family:inherit}
     <div class="method-item"><div class="method-lbl">Clustering (DBSCAN)</div><div class="method-desc">&epsilon;=1km &middot; 30-day window &middot; min 3 or 5 events. Identifies patterns consistent with a single actor targeting one group in a small area over a short time.</div></div>
     <div class="method-item"><div class="method-lbl">Prediction model</div><div class="method-desc">Exponential inter-arrival (Poisson) on 2023+ data. Location = median coordinates from 2025+ group events. 70% CI at 15th&ndash;85th percentile of exponential distribution.</div></div>
     <div class="method-item"><div class="method-lbl">Risk coefficient</div><div class="method-desc">= (events/100k population) &times; (mean severity 1&ndash;10) &times; (current events X-factor). Normalized 0&ndash;100. Not a law enforcement risk assessment.</div></div>
+    <div class="method-item">
+      <div class="method-lbl">Offense severity scoring</div>
+      <div class="method-desc">Each offense type is assigned a fixed severity score (1&ndash;10, homicide highest). Reconstructed from the dashboard's original ground-truth data as a clean, exact mapping.</div>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;font-size:11px;color:var(--blue)">Show full scoring table</summary>
+        <table class="ctable" style="margin-top:8px">
+          <thead><tr><th>Offense</th><th style="text-align:right">Score</th></tr></thead>
+          <tbody id="severityScoreTable"></tbody>
+        </table>
+      </details>
+    </div>
   </div>
 </div>
 </div>
@@ -420,7 +438,7 @@ kbd{font-family:inherit}
 // ── DATA (loaded at runtime from data/events.json + data/analytics.json) ──────
 let GROUPS, ADDR_LUT, OFF_LUT, EV_RAW, C3, C5, KM_ALL, KM_25, PREDS, RISK,
     MONTHLY, JEWISH_BD, ASIAN_BD, OFFENSE_GRP, GY_DATA, STACKED, STACKED_YEARS, CAL_DATA,
-    CITIES, GROUP_STATES, RAW_EVENTS, GENERATED_AT;
+    CITIES, GROUP_STATES, RAW_EVENTS, GENERATED_AT, SEVERITY_MAP, DATA_QUALITY;
 
 async function loadDashboardData(){
   const [eventsResp, analyticsResp] = await Promise.all([
@@ -486,6 +504,8 @@ async function loadDashboardData(){
   CITIES = analytics.cities || [];
   GROUP_STATES = analytics.group_states || [];
   GENERATED_AT = analytics.generated_at || null;
+  SEVERITY_MAP = analytics.severity_map || {};
+  DATA_QUALITY = analytics.data_quality || {unmapped_offenses:[],unexpected_groups:[]};
 }
 
 
@@ -1198,6 +1218,35 @@ function setText(id,txt){
   var el=document.getElementById(id);
   if(el) el.textContent=txt;
 }
+function renderSeverityTable(){
+  var el=document.getElementById('severityScoreTable');
+  if(!el||!SEVERITY_MAP) return;
+  var rows=Object.keys(SEVERITY_MAP).map(function(off){return {offense:off,score:SEVERITY_MAP[off]};});
+  rows.sort(function(a,b){return b.score-a.score||a.offense.localeCompare(b.offense);});
+  el.innerHTML=rows.map(function(r){
+    return '<tr><td>'+r.offense+'</td><td style="text-align:right">'+r.score+'</td></tr>';
+  }).join('');
+}
+function renderDataQuality(){
+  var el=document.getElementById('dataQualityPanel');
+  if(!el||!DATA_QUALITY) return;
+  var uo=DATA_QUALITY.unmapped_offenses||[];
+  var ug=DATA_QUALITY.unexpected_groups||[];
+  if(uo.length===0 && ug.length===0){
+    el.innerHTML='<div style="color:#5DCAA5">&#10003; Clean &mdash; every offense type matched the severity table and every bias-group label resolved to a known category in this pull.</div>';
+    return;
+  }
+  var html='<div style="color:#F4C0D1;font-weight:600;margin-bottom:6px">&#9888; Review needed</div>';
+  if(uo.length){
+    html+='<div style="margin-bottom:8px"><strong>Offense types with no severity score assigned</strong> (these events show severity as N/A until a score is added):<br>'+
+      uo.map(function(r){return '&bull; "'+r.offense+'" &mdash; '+r.count+' event'+(r.count===1?'':'s');}).join('<br>')+'</div>';
+  }
+  if(ug.length){
+    html+='<div><strong>Bias-group labels not yet mapped to a known category</strong> (showing as their own raw label instead of collapsing correctly):<br>'+
+      ug.map(function(r){return '&bull; "'+r.group+'" &mdash; '+r.count+' event'+(r.count===1?'':'s');}).join('<br>')+'</div>';
+  }
+  el.innerHTML=html;
+}
 function updateOverviewStats(){
   if(!RAW_EVENTS||!RAW_EVENTS.length) return;
   var dates=RAW_EVENTS.map(function(e){return e.date;}).sort();
@@ -1265,6 +1314,8 @@ function kmBar(id,data){
   });
 }
 updateOverviewStats();
+renderSeverityTable();
+renderDataQuality();
 renderPredCards();
 renderGroupStateTable();
 renderCityTable();

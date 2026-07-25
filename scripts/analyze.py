@@ -417,6 +417,50 @@ def offense_breakdown(events):
     return result
 
 
+# The canonical set of group categories this pipeline knows how to handle.
+# Any group name outside this set means a new raw label appeared in the
+# source data that isn't yet covered by SUBGROUP_TO_GROUP/BIAS_TYPE_KEYWORDS
+# in build_data.py, and needs a mapping added.
+CANONICAL_GROUPS = {
+    "American Indian", "Arab", "Arab/Middle Eastern or Jewish", "Asian",
+    "Black", "Buddhist", "Catholic", "Christian", "Disabled", "Female",
+    "Hindu", "Hispanic", "Homeless", "Homosexual", "Islamic", "Jewish",
+    "Multi-Racial", "Multi-Religious Group", "Other", "Other Christian",
+    "Other Ethnicity", "Other Religion", "Other/Unknown Religion",
+    "Political Group", "Protestant", "Sikh", "Transgender", "Unspecified",
+    "White",
+}
+
+
+def data_quality_check(events, severity_map):
+    """Self-check the pipeline's own output for two failure modes we've
+    hit before: (1) a new offense type appears that isn't in the severity
+    scoring table, silently producing a null severity, and (2) a new raw
+    bias-group label appears that isn't covered by the group-collapsing
+    logic, silently creating a new stray category. Both get reported here
+    instead of requiring a manual diff against the raw source data."""
+    unmapped_offense_counts = Counter()
+    for e in events:
+        off = e.get("offense")
+        if off and off not in severity_map:
+            unmapped_offense_counts[off] += 1
+
+    unexpected_group_counts = Counter()
+    for e in events:
+        g = e.get("group")
+        if g and g not in CANONICAL_GROUPS:
+            unexpected_group_counts[g] += 1
+
+    return {
+        "unmapped_offenses": [
+            {"offense": o, "count": c} for o, c in unmapped_offense_counts.most_common()
+        ],
+        "unexpected_groups": [
+            {"group": g, "count": c} for g, c in unexpected_group_counts.most_common()
+        ],
+    }
+
+
 def calendar_daily_counts(events):
     """CAL_DATA: {date: count} for events from CAL_MIN_DATE onward."""
     counts = Counter(
@@ -528,6 +572,22 @@ def main():
     print(f"OFFENSE_GRP groups: {len(offense_grp)}, CAL_DATA days: {len(cal_data)}")
     print(f"City breakdown rows: {len(cities)}, Group/state rows: {len(group_states)}")
 
+    severity_map_path = os.path.join(os.path.dirname(__file__), "offense_severity_map.json")
+    with open(severity_map_path) as f:
+        severity_map = json.load(f)
+
+    quality = data_quality_check(events, severity_map)
+    if quality["unmapped_offenses"]:
+        print("WARNING: unmapped offense types found (severity will be null for these):")
+        for row in quality["unmapped_offenses"]:
+            print(f"  '{row['offense']}': {row['count']} events")
+    if quality["unexpected_groups"]:
+        print("WARNING: unexpected group categories found (not in CANONICAL_GROUPS):")
+        for row in quality["unexpected_groups"]:
+            print(f"  '{row['group']}': {row['count']} events")
+    if not quality["unmapped_offenses"] and not quality["unexpected_groups"]:
+        print("Data quality check: clean, no unmapped offenses or unexpected groups.")
+
     analytics = {
         "c3": c3, "c5": c5,
         "km_all": km_all, "km_25": km_25,
@@ -537,6 +597,7 @@ def main():
         "gy_data": gy_data, "stacked": stacked, "stacked_years": stacked_years,
         "offense_grp": offense_grp, "cal_data": cal_data,
         "cities": cities, "group_states": group_states,
+        "severity_map": severity_map, "data_quality": quality,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
