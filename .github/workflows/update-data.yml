@@ -48,5 +48,13 @@ jobs:
             echo "No data changes to commit."
           else
             git commit -m "Automated weekly data update ($(date -u +%Y-%m-%d))"
-            git push
+            # Retry push with a rebase in case another commit landed on main
+            # while this run was fetching/analyzing (e.g. a manual code push).
+            for i in 1 2 3; do
+              if git push; then
+                break
+              fi
+              echo "Push rejected, pulling and rebasing (attempt $i)..."
+              git pull --rebase origin main
+            done
           fi
