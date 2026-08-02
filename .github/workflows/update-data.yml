@@ -2,9 +2,13 @@ name: Update hate crime data
 
 on:
   schedule:
-    # Every Saturday at 08:00 UTC (= midnight Pacific Time, PDT/UTC-7).
+    # Every Saturday at 04:00 UTC (= midnight Eastern, currently EDT/UTC-4).
+    # NOTE: GitHub Actions cron is fixed UTC and does not auto-adjust for
+    # daylight saving. During EST (UTC-5, roughly Nov-Mar) this will fire
+    # at 11pm Eastern Friday night instead of true midnight Saturday -
+    # nudge to '0 5 * * 6' during EST months to keep it at exact midnight.
     # Timed to catch Montgomery County's Friday data updates promptly.
-    - cron: '0 8 * * 6'
+    - cron: '0 4 * * 6'
   workflow_dispatch: {}  # allows manual "Run workflow" trigger from the Actions tab
 
 permissions:
