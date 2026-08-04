@@ -461,6 +461,82 @@ def data_quality_check(events, severity_map):
     }
 
 
+ACTIVE_PATTERN_WINDOW_DAYS = 30  # a cluster counts as "active" if most of
+                                  # its events fall within this many days
+                                  # of the most recent data
+
+
+def detect_active_patterns(events, c3_clusters):
+    """Flag clusters that look like an actively-forming or escalating
+    pattern right now, rather than an old historical hotspot:
+      - "active": most of the cluster's events happened within the last
+        ACTIVE_PATTERN_WINDOW_DAYS of the most recent data we have.
+      - "escalating": comparing the first half of the cluster's events
+        (chronologically) to the second half, average severity rose.
+    Returns a list of dicts, one per flagged cluster, with a short
+    auto-generated plain-English summary sentence."""
+    if not events or not c3_clusters:
+        return []
+
+    events_by_id = {e["id"]: e for e in events if e.get("id")}
+    max_date = max(e["_date"] for e in events)
+    cutoff = max_date - timedelta(days=ACTIVE_PATTERN_WINDOW_DAYS)
+
+    patterns = []
+    for c in c3_clusters:
+        member_ids = c.get("member_ids", [])
+        members = [events_by_id[i] for i in member_ids if i in events_by_id]
+        if len(members) < 3:
+            continue
+        members.sort(key=lambda e: e["_date"])
+
+        recent_count = sum(1 for m in members if m["_date"] >= cutoff)
+        days_since_last_event = (max_date - members[-1]["_date"]).days
+        is_active = days_since_last_event <= ACTIVE_PATTERN_WINDOW_DAYS
+        if not is_active:
+            continue
+
+        mid = len(members) // 2
+        first_half, second_half = members[:mid] or members[:1], members[mid:]
+        sevs_first = [m["severity"] for m in first_half if m["severity"] is not None]
+        sevs_second = [m["severity"] for m in second_half if m["severity"] is not None]
+        avg_first = sum(sevs_first) / len(sevs_first) if sevs_first else None
+        avg_second = sum(sevs_second) / len(sevs_second) if sevs_second else None
+        is_escalating = (
+            avg_first is not None and avg_second is not None and avg_second > avg_first + 0.5
+        )
+
+        offenses_first = Counter(m["offense"] for m in first_half if m["offense"])
+        offenses_second = Counter(m["offense"] for m in second_half if m["offense"])
+        top_off_first = offenses_first.most_common(1)[0][0] if offenses_first else None
+        top_off_second = offenses_second.most_common(1)[0][0] if offenses_second else None
+        offense_shifted = bool(top_off_first and top_off_second and top_off_first != top_off_second)
+
+        radius_km = 1.0  # matches DBSCAN_EPS_KM used to build these clusters
+        summary = (
+            f"{recent_count} of the {len(members)} events in this cluster occurred in the last "
+            f"{ACTIVE_PATTERN_WINDOW_DAYS} days, targeting {c['group']}, within a {radius_km:.0f}km radius."
+        )
+        if is_escalating:
+            summary += f" Average severity has risen from {avg_first:.1f} to {avg_second:.1f}."
+        if offense_shifted:
+            summary += f" Offense type has shifted from {top_off_first} toward {top_off_second}."
+
+        patterns.append({
+            "cluster_key": c["key"], "group": c["group"], "events": len(members),
+            "recent_events": recent_count, "lat": c["lat"], "lon": c["lon"],
+            "start": c["start"], "end": c["end"],
+            "is_escalating": is_escalating, "offense_shifted": offense_shifted,
+            "avg_severity_first_half": round(avg_first, 1) if avg_first is not None else None,
+            "avg_severity_second_half": round(avg_second, 1) if avg_second is not None else None,
+            "top_offense_first_half": top_off_first, "top_offense_second_half": top_off_second,
+            "summary": summary,
+        })
+
+    patterns.sort(key=lambda p: (-p["is_escalating"], -p["recent_events"]))
+    return patterns
+
+
 def calendar_daily_counts(events):
     """CAL_DATA: {date: count} for events from CAL_MIN_DATE onward."""
     counts = Counter(
@@ -550,6 +626,12 @@ def main():
     c5 = spatio_temporal_dbscan(events, min_samples=5)
     print(f"C3 clusters: {len(c3)}, C5 clusters: {len(c5)}")
 
+    active_patterns = detect_active_patterns(events, c3)
+    for p in active_patterns:
+        p["place"] = reverse_geocode(p["lat"], p["lon"])
+    print(f"Active patterns flagged: {len(active_patterns)} "
+          f"({sum(1 for p in active_patterns if p['is_escalating'])} escalating)")
+
     km_all = kmeans_hotspots(events, k=KMEANS_K)
     events_25 = [e for e in events if e["_date"].year >= KM25_MIN_YEAR]
     km_25 = kmeans_hotspots(events_25, k=min(KMEANS_K, max(1, len(events_25))))
@@ -598,6 +680,7 @@ def main():
         "offense_grp": offense_grp, "cal_data": cal_data,
         "cities": cities, "group_states": group_states,
         "severity_map": severity_map, "data_quality": quality,
+        "active_patterns": active_patterns,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
