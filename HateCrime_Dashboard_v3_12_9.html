@@ -524,6 +524,7 @@ async function loadDashboardData(){
   GENERATED_AT = analytics.generated_at || null;
   SEVERITY_MAP = analytics.severity_map || {};
   DATA_QUALITY = analytics.data_quality || {unmapped_offenses:[],unexpected_groups:[]};
+  ACTIVE_PATTERNS = analytics.active_patterns || [];
 }
 
 
@@ -1245,6 +1246,39 @@ function renderSeverityTable(){
     return '<tr><td>'+r.offense+'</td><td style="text-align:right">'+r.score+'</td></tr>';
   }).join('');
 }
+function renderSuspiciousPatterns(){
+  var el=document.getElementById('suspiciousPatternsPanel');
+  if(!el) return;
+  var pats=ACTIVE_PATTERNS||[];
+  if(!pats.length){
+    el.innerHTML='<div class="sp-calm"><span class="sp-icon">&#10003;</span><div>'+
+      '<p class="sp-title">No suspicious patterns detected</p>'+
+      '<p class="sp-sub">No recent cluster is showing signs of escalation. Checked with each weekly data update.</p></div></div>';
+    return;
+  }
+  function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function fd(d){
+    if(!d) return '';
+    var dt=new Date(String(d).slice(0,10)+'T00:00:00');
+    return isNaN(dt)?esc(d):dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+  el.innerHTML=pats.map(function(p,i){
+    var title='Suspicious pattern detected - '+esc(dispGroup(p.group))+(p.place?', '+esc(p.place):'');
+    var tags='<span class="sp-tag">'+p.events+' event'+(p.events===1?'':'s')+'</span>'+
+      '<span class="sp-tag">'+fd(p.start)+' &ndash; '+fd(p.end)+'</span>'+
+      (p.is_escalating?'<span class="sp-tag sp-tag-escalating">Escalating</span>':'');
+    return '<div class="sp-alert" data-sp-idx="'+i+'">'+
+      '<div class="sp-alert-head"><span class="sp-alert-icon">&#9888;</span><p class="sp-alert-title">'+title+'</p></div>'+
+      '<p class="sp-alert-summary">'+esc(p.summary)+'</p>'+
+      '<div class="sp-tags">'+tags+'</div></div>';
+  }).join('');
+  el.querySelectorAll('.sp-alert').forEach(function(card){
+    card.addEventListener('click',function(){
+      var p=pats[+card.getAttribute('data-sp-idx')];
+      flyToCluster(p.cluster_key,p.group,p.lat,p.lon);
+    });
+  });
+}
 function renderDataQuality(){
   var el=document.getElementById('dataQualityPanel');
   if(!el||!DATA_QUALITY) return;
@@ -1332,6 +1366,7 @@ function kmBar(id,data){
   });
 }
 updateOverviewStats();
+renderSuspiciousPatterns();
 renderSeverityTable();
 renderDataQuality();
 renderPredCards();

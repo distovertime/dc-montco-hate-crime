@@ -7,21 +7,11 @@
 - Credentials: Ron supplies a fine-grained GitHub token per session (Contents, Workflows, Actions = read/write). Never commit it.
 - CARTO basemap key is in the tile URL in index.html (required since late Aug 2026; fine to be public).
 
-## In progress: "Suspicious Patterns" banner
-Decisions made with Ron:
-- Wording: "Suspicious" (not "Active"). Keep "Escalating". Calm state text: "No suspicious patterns detected".
-- Placement: its own section right after the header, before Overview.
-- Stack one card per flagged cluster. Calm = teal, alert = coral. Mockup was approved.
-
-Backend DONE: analytics.json has `active_patterns` (currently [] = quiet week). Each item has: cluster_key, group, events, recent_events, lat, lon, start, end, is_escalating, offense_shifted, avg_severity_first_half, avg_severity_second_half, top_offense_first_half, top_offense_second_half, summary, place.
-
-Frontend scaffolding pushed: `<div id="suspiciousPatternsPanel">` section, `.sp-*` CSS classes, `ACTIVE_PATTERNS` global.
-
-Frontend REMAINING:
-1. In loadDashboardData(), after the DATA_QUALITY line: `ACTIVE_PATTERNS = analytics.active_patterns || [];`
-2. Write renderSuspiciousPatterns(): if empty, one `.sp-calm` block; else one `.sp-alert` card per pattern with title "Suspicious pattern detected - {dispGroup(group)}, {place}", `p.summary` as body, `.sp-tag` chips (event count, start-end dates, and `.sp-tag-escalating` "Escalating" if is_escalating), onclick -> flyToCluster(p.cluster_key, p.group, p.lat, p.lon).
-3. Call it from initDashboard next to updateOverviewStats().
-4. Test with sample data (real data has none), run node --check, copy index.html to HateCrime_Dashboard_v3_12_9.html, pull then push.
+## Done: "Suspicious Patterns" banner
+- Wording: "Suspicious" (not "Active"); "Escalating" tag kept; calm text "No suspicious patterns detected". Own section after the header, before Overview. One card per flagged cluster; calm = teal, alert = coral.
+- Backend: analytics.json `active_patterns` (currently [] = quiet week).
+- Frontend: `ACTIVE_PATTERNS` loaded in loadDashboardData(); `renderSuspiciousPatterns()` called in initDashboard next to updateOverviewStats(); cards click through to flyToCluster (bound via addEventListener, no window.* needed).
+- Not yet seen with real data (none flagged). Verified only with sample data via a node test of the render function.
 
 ## Gotchas learned
 - Always `git pull` before pushing: the workflow commits data files too.
