@@ -8,7 +8,7 @@
 - CARTO basemap key is in the tile URL in index.html (required since late Aug 2026; fine to be public).
 
 ## Done: "Suspicious Patterns" banner
-- Wording: "Suspicious" (not "Active"); "Escalating" tag kept; calm text "No suspicious patterns detected". Own section after the header, before Overview. One card per flagged cluster; calm = teal, alert = coral.
+- Wording: "Suspicious" (not "Active"); "Escalating" tag kept; calm text "No active suspicious patterns detected" + "No cluster has had a new event in the last 30 days.". Own section after the header, before Overview. One card per flagged cluster; calm = teal, alert = coral.
 - Backend: analytics.json `active_patterns` (currently [] = quiet week).
 - Frontend: `ACTIVE_PATTERNS` loaded in loadDashboardData(); `renderSuspiciousPatterns()` called in initDashboard next to updateOverviewStats(); cards click through to flyToCluster (bound via addEventListener, no window.* needed).
 - Not yet seen with real data (none flagged). Verified only with sample data via a node test of the render function.

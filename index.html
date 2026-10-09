@@ -1252,8 +1252,8 @@ function renderSuspiciousPatterns(){
   var pats=ACTIVE_PATTERNS||[];
   if(!pats.length){
     el.innerHTML='<div class="sp-calm"><span class="sp-icon">&#10003;</span><div>'+
-      '<p class="sp-title">No suspicious patterns detected</p>'+
-      '<p class="sp-sub">No recent cluster is showing signs of escalation. Checked with each weekly data update.</p></div></div>';
+      '<p class="sp-title">No active suspicious patterns detected</p>'+
+      '<p class="sp-sub">No cluster has had a new event in the last 30 days. Checked with each weekly data update.</p></div></div>';
     return;
   }
   function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
