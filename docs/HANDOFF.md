@@ -18,6 +18,12 @@
 - flyToCluster(key,group,lat,lon,thr): optional thr. Banner passes 3. Keys like Jewish_2 exist in BOTH C3 and C5 as different clusters, so key-only lookup can open the wrong one (table rows still use the old lookup; known gap).
 - Known gap: cluster table shows only the top 20 by size (slice(0,20)) under an "All clusters" tab label, so small recent clusters (e.g. Jewish_33, rank 95 of 98) never appear in it. Tab label says ">3 events" but clusters are 3+.
 
+## Shipped (2026-10-10): cluster table, calendar zoom, tile seams
+- Cluster table: active clusters (last event within 30 days of the newest event in the data, same rule as the banner) are pinned first with a coral "Active" pill + row tint, then the 20 largest. Caption under the tabs explains the order. Row clicks now pass the right threshold (3 or 5) to flyToCluster, which fixes the Jewish_2-style key collision for table rows too.
+- Labels: ">3"/">5 events" changed to "3+"/"5+" (tabs and metric tiles) since 3- and 5-event clusters are included.
+- Calendar: selecting a day/range (month grid or heat strip) now zooms the map to those events via zoomToSelectedDates() (fitBounds, maxZoom 14).
+- Tile seams: added `.leaflet-tile-container img{outline:1px solid transparent}`. UNVERIFIED best guess for thin horizontal/vertical lines at max zoom; Ron reports lines appear when zoomed all the way in. If they persist, next ideas: cap maxZoom at 18/19 with maxNativeZoom, or check for overzoom/devicePixelRatio issues.
+
 ## Gotchas learned
 - Always `git pull` before pushing: the workflow commits data files too.
 - Set git user.name/email in a fresh clone or commits silently fail.
