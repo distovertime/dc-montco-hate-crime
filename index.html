@@ -80,8 +80,6 @@ h1{font-size:24px;font-weight:600;line-height:1.2}
 .ctable tr.is-active:hover td{background:rgba(216,90,48,0.12)}
 .pill-active{display:inline-block;margin-left:8px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:20px;color:var(--coral);background:rgba(216,90,48,0.12);border:0.5px solid rgba(216,90,48,0.4)}
 .cluster-cap{font-size:12px;color:var(--text2);margin:0 0 10px}
-/* Hide hairline seams between map tiles (shows at high zoom in some browsers) */
-.leaflet-tile-container img{outline:1px solid transparent}
 .ctable tr:hover td,.ctable tr.row-active td{background:rgba(55,138,221,0.08);cursor:pointer}
 .sev-pill{display:inline-block;font-size:10px;font-weight:500;padding:2px 6px;border-radius:8px}
 .note-box{background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--text3);line-height:1.7}
@@ -1022,13 +1020,12 @@ function renderClusters(data){
   var cut='';
   if(latest){ var t=new Date(latest+'T00:00:00'); t.setDate(t.getDate()-ACTIVE_DAYS); cut=t.toISOString().slice(0,10); }
   var thr=(data===C5)?5:3;
-  var act=data.filter(function(c){return cut&&c.end>=cut;}).sort(function(a,b){return a.end<b.end?1:(a.end>b.end?-1:0);});
-  var actKeys=new Set(act.map(function(c){return c.key;}));
-  var rest=data.filter(function(c){return !actKeys.has(c.key);}).slice(0,20);
+  // Newest first by last event date; clusters still active in the last 30 days are tagged.
+  var sorted=data.slice().sort(function(a,b){return a.end<b.end?1:(a.end>b.end?-1:(b.events-a.events));});
+  var act=sorted.filter(function(c){return cut&&c.end>=cut;});
+  var rest=sorted.filter(function(c){return !(cut&&c.end>=cut);}).slice(0,20-Math.min(act.length,20));
   var cap=document.getElementById('clusterCap');
-  if(cap) cap.textContent=act.length
-    ? act.length+' active cluster'+(act.length===1?'':'s')+' (new event in the last '+ACTIVE_DAYS+' days) listed first, then the 20 largest. '+data.length+' clusters total.'
-    : 'No active clusters (no new event in the last '+ACTIVE_DAYS+' days). Showing the 20 largest of '+data.length+'.';
+  if(cap) cap.textContent=act.length+' active cluster'+(act.length===1?'':'s')+' (new event in the last '+ACTIVE_DAYS+' days). Sorted newest first; showing the '+(act.length+rest.length)+' most recent of '+data.length+'.';
   act.map(function(c){return [c,true];}).concat(rest.map(function(c){return [c,false];})).forEach(function(pair){
     var c=pair[0], isAct=pair[1];
     var col=gc(c.group),sc=sevC(c.sev);
@@ -1051,6 +1048,33 @@ function renderClusters(data){
       '<td><span class="sev-pill" style="background:'+sc+'22;color:'+sc+'">'+(c.sev!=null?c.sev.toFixed(1):'N/A')+'</span></td>';
     tbody.appendChild(tr);
   });
+}
+function flyToCluster(key,group,lat,lon,thr){
+  S.layer='clusters';
+  // thr is passed by callers that know which list the key came from (keys such as
+  // Jewish_2 exist in both the 3+ and 5+ lists as different clusters).
+  S.clThr=thr?thr:(C5.find(function(c){return c.key===key;})?5:3);
+  // Clear stale date filters: clusters are hidden when their span misses the active
+  // calendar/slider selection, which made the map look empty.
+  S.selDates.clear();
+  pctL=0; pctR=1; S.dateFrom=null; S.dateTo=null;
+  if(typeof syncDateFields==='function') syncDateFields();
+  updateSliderUI();
+  var selCnt=document.getElementById('calSelCount'); if(selCnt) selCnt.textContent='';
+  var cl=(S.clThr===5?C5:C3).find(function(c){return c.key===key;});
+  if(cl && cl.start) S.calViewMonth=cl.start.slice(0,7);
+  S.selectedClusterKey=key;
+  // Also set a cluster membership filter so filtered() returns only these events
+  S._clusterGroupFilter=group;
+  setGroup(group);
+  document.getElementById('btnClusters').classList.add('active');
+  document.getElementById('btnAll').classList.remove('active');
+  actLayerBtn=document.getElementById('btnClusters');
+  map.flyTo([lat,lon],13,{duration:0.8,easeLinearity:0.5});
+  // After fly completes, render will show events at zoom 13
+  render();
+  renderCalendarGrid(); renderCalEventCards();
+  document.getElementById('map').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function showClusters(btn,n){
   document.querySelectorAll('#c3tab,#c5tab').forEach(t=>t.classList.remove('active'));
@@ -1489,10 +1513,21 @@ function calDayMouseUp(e,ds){
     }
   }
   _calDragStart=null; _calDragging=false;
+  if(S.selDates.size) leaveClusterFocus();
   renderCalendarGrid();
   renderCalEventCards();
   render();
   zoomToSelectedDates();
+}
+function leaveClusterFocus(){
+  // A calendar date selection means the user is exploring by date, so drop the
+  // cluster focus (and the group the cluster click applied), otherwise the two
+  // filters combine and usually match nothing.
+  if(!S.selectedClusterKey) return;
+  var hadGroup=S._clusterGroupFilter;
+  S.selectedClusterKey=null; S._clusterGroupFilter=null;
+  if(hadGroup) setGroup('');
+  if(S.layer==='clusters') setLayer(document.getElementById('btnAll'),'all');
 }
 function zoomToSelectedDates(){
   if(!S.selDates||S.selDates.size===0) return;
@@ -1677,6 +1712,7 @@ function buildCal(){
       for(var i=lo;i<=hi;i++) S.selDates.add(dates[i]);
     }
     dragStartIdx=null; isDragging=false;
+    if(S.selDates.size) leaveClusterFocus();
     updateCalTooltip(); drawCal(); render(); zoomToSelectedDates();
   });
 

@@ -24,6 +24,14 @@
 - Calendar: selecting a day/range (month grid or heat strip) now zooms the map to those events via zoomToSelectedDates() (fitBounds, maxZoom 14).
 - Tile seams: added `.leaflet-tile-container img{outline:1px solid transparent}`. UNVERIFIED best guess for thin horizontal/vertical lines at max zoom; Ron reports lines appear when zoomed all the way in. If they persist, next ideas: cap maxZoom at 18/19 with maxNativeZoom, or check for overzoom/devicePixelRatio issues.
 
+## Hotfix + testing lessons (2026-10-10)
+- REGRESSION (fixed): commit 3c968e9 deleted flyToCluster. It sits between renderClusters and showClusters, and the patch replaced everything between those two function names. Banner and table clicks did nothing. NEVER patch by slicing between function names; assert the function you are not touching still exists after the patch (grep -c "function flyToCluster" index.html).
+- Mock-only tests missed it. Test in a real browser: `npm i puppeteer-core @sparticuz/chromium leaflet@1.9.4 leaflet-draw@1.0.4 chart.js@4.4.1` (use `require('@sparticuz/chromium').default`, headless:'shell'), serve the repo locally, intercept the CDN script/CSS requests and serve them from node_modules, abort tile requests, and append `L.Map.addInitHook(function(){window.__map=this;})` to leaflet.js so tests can read map zoom/center. Clicking .sp-alert, a #clusterBody row, and a #calGrid .cal-day[data-date=...] covers the three entry points.
+- Calendar date selection now calls leaveClusterFocus() (drops selected cluster + the group the cluster click applied, returns layer to All events) and then zoomToSelectedDates(). Without it the cluster and date filters combined and matched nothing.
+- Cluster table is now sorted newest-first by end date (active ones carry the pill), capped at 20 rows. Removed the unverified tile-seam CSS (it did not help).
+- OPEN: map lines (horizontal/vertical, always present per Ron). A tiles-blocked screenshot shows none, so they come from the basemap tiles, not our markers/overlays. Need a screenshot + browser/OS from Ron.
+- OPEN: clustering rule is stricter than its label. analyze.py runs DBSCAN eps=1 on (km, km, days/30) = a 3D Euclidean ball, so two events 1 km apart must be the same day and events 15 days apart must be <=0.87 km. The UI says "<=1 km, <=30 days" (reads as a box). Replicated: current rule gives 98 (3+) / 10 (5+) clusters; a true box rule (metric='chebyshev') gives 124 / 23, including a 7-event Homosexual cluster Apr 30-Jun 18 2025 the current rule misses. Newest 5+ cluster under the current rule ends 2025-03-29. Decision pending: fix the label or change the rule (would also change active_patterns).
+
 ## Gotchas learned
 - Always `git pull` before pushing: the workflow commits data files too.
 - Set git user.name/email in a fresh clone or commits silently fail.
