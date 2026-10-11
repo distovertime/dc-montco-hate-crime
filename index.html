@@ -1026,9 +1026,20 @@ function renderClusters(data){
     tbody.appendChild(tr);
   });
 }
-function flyToCluster(key,group,lat,lon){
+function flyToCluster(key,group,lat,lon,thr){
   S.layer='clusters';
-  S.clThr=C5.find(function(c){return c.key===key;})?5:3;
+  // thr is passed by callers that know which list the key came from (keys such as
+  // Jewish_2 exist in both the 3+ and 5+ lists as different clusters).
+  S.clThr=thr?thr:(C5.find(function(c){return c.key===key;})?5:3);
+  // Clear stale date filters: clusters are hidden when their span misses the active
+  // calendar/slider selection, which made the map look empty.
+  S.selDates.clear();
+  pctL=0; pctR=1; S.dateFrom=null; S.dateTo=null;
+  if(typeof syncDateFields==='function') syncDateFields();
+  updateSliderUI();
+  var selCnt=document.getElementById('calSelCount'); if(selCnt) selCnt.textContent='';
+  var cl=(S.clThr===5?C5:C3).find(function(c){return c.key===key;});
+  if(cl && cl.start) S.calViewMonth=cl.start.slice(0,7);
   S.selectedClusterKey=key;
   // Also set a cluster membership filter so filtered() returns only these events
   S._clusterGroupFilter=group;
@@ -1039,6 +1050,7 @@ function flyToCluster(key,group,lat,lon){
   map.flyTo([lat,lon],13,{duration:0.8,easeLinearity:0.5});
   // After fly completes, render will show events at zoom 13
   render();
+  renderCalendarGrid(); renderCalEventCards();
   document.getElementById('map').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function showClusters(btn,n){
@@ -1275,7 +1287,7 @@ function renderSuspiciousPatterns(){
   el.querySelectorAll('.sp-alert').forEach(function(card){
     card.addEventListener('click',function(){
       var p=pats[+card.getAttribute('data-sp-idx')];
-      flyToCluster(p.cluster_key,p.group,p.lat,p.lon);
+      flyToCluster(p.cluster_key,p.group,p.lat,p.lon,3);
     });
   });
 }
@@ -1485,15 +1497,26 @@ function calDayMouseUp(e,ds){
 function renderCalEventCards(){
   var el=document.getElementById('calEventCards');
   if(!el||!RAW_EVENTS) return;
-  if(S.selDates.size===0){ el.innerHTML=''; return; }
+  var clusterMode=false, clusterHead='';
+  var matches;
+  if(S.selDates.size===0){
+    if(!S.selectedClusterKey){ el.innerHTML=''; return; }
+    var cl=(S.clThr===5?C5:C3).find(function(c){return c.key===S.selectedClusterKey;});
+    if(!cl){ el.innerHTML=''; return; }
+    var ids=new Set(cl.member_ids||[]);
+    matches=RAW_EVENTS.filter(function(e){return ids.has(e.id);});
+    clusterMode=true;
+    clusterHead='<div style="font-size:11px;color:var(--text2);margin-bottom:6px">'+matches.length+' events in the selected cluster</div>';
+  } else {
+    matches=RAW_EVENTS.filter(function(e){return S.selDates.has(e.date);});
+  }
   var selDates=Array.from(S.selDates).sort();
-  var matches=RAW_EVENTS.filter(function(e){return S.selDates.has(e.date);});
   matches.sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
   if(!matches.length){
     el.innerHTML='<div class="cal-empty-msg">No events on '+(selDates.length>1?'these days':selDates[0])+'.</div>';
     return;
   }
-  el.innerHTML=matches.map(function(e){
+  el.innerHTML=clusterHead+matches.map(function(e){
     var loc=e.place?(e.city?e.place+', '+e.city:e.place):(e.city||e.address||'');
     return '<div class="cal-event-card">'+
       '<div class="ce-head"><span class="ce-date">'+e.date+'</span>'+
@@ -1767,6 +1790,7 @@ function resetMap(){
   document.getElementById('calTooltip').textContent='';
   map.setView([39.02,-77.07],11);
   render();
+  renderCalendarGrid(); renderCalEventCards();
 }
 function maybeClose(e){if(e.target===document.getElementById('overlay'))closeDrill();}
 
@@ -2038,6 +2062,7 @@ function toggleAllGroups(){
 }
 
 function toggleGrpBtn(btn,g){
+  var hadCluster=!!S.selectedClusterKey;
   S.selectedClusterKey=null; S._clusterGroupFilter=null;
   document.getElementById('btnGrpAll').classList.remove('active');
   if(S.groups.has(g)){
@@ -2051,6 +2076,7 @@ function toggleGrpBtn(btn,g){
     btn.classList.add('grp-active');
   }
   render();
+  if(hadCluster) renderCalEventCards();
 }
 
 function setGroup(g){

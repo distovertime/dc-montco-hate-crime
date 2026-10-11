@@ -13,6 +13,11 @@
 - Frontend: `ACTIVE_PATTERNS` loaded in loadDashboardData(); `renderSuspiciousPatterns()` called in initDashboard next to updateOverviewStats(); cards click through to flyToCluster (bound via addEventListener, no window.* needed).
 - Not yet seen with real data (none flagged). Verified only with sample data via a node test of the render function.
 
+## Fixed: banner/table click-through (2026-10-10)
+- flyToCluster() now clears calendar selection + date slider (a stale selection hid clusters whose span missed it), moves the calendar to the cluster's start month, and lists the cluster's own events under the calendar (via member_ids) instead of selecting dates, since date selection also lists non-member events from the same days.
+- flyToCluster(key,group,lat,lon,thr): optional thr. Banner passes 3. Keys like Jewish_2 exist in BOTH C3 and C5 as different clusters, so key-only lookup can open the wrong one (table rows still use the old lookup; known gap).
+- Known gap: cluster table shows only the top 20 by size (slice(0,20)) under an "All clusters" tab label, so small recent clusters (e.g. Jewish_33, rank 95 of 98) never appear in it. Tab label says ">3 events" but clusters are 3+.
+
 ## Gotchas learned
 - Always `git pull` before pushing: the workflow commits data files too.
 - Set git user.name/email in a fresh clone or commits silently fail.
